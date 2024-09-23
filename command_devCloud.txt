@@ -1,0 +1,38 @@
+# connect to the DevCloud
+ssh devcloud
+
+# On the log in node, source the devcloudLoginToolSetup.sh script 
+# to log in to FPGA queue.
+source /data/intel_fpga/devcloudLoginToolSetup.sh
+
+# Run the following command to connect to any FPGA nodes.
+devcloud_login
+
+# Once you are into any specific node, 
+#source the devcloudLoginToolSetup.sh script once again 
+#before running tools_setup command.
+source /data/intel_fpga/devcloudLoginToolSetup.sh
+tools_setup
+
+
+
+########
+# Check the Queue Status
+qstat
+
+# This command will request any available node with 2 processors per node,
+# instead of targeting a specific node like s001-n142.
+qsub -I -l nodes=1:ppn=2
+
+# Request Fewer Resources:
+# If you're requesting too many resources (e.g., multiple processors), 
+# the job might be delayed. Try reducing the number of processors
+qsub -I -l nodes=1:ppn=1
+
+# check the status of all available nodes
+pbsnodes
+
+# cancel your job
+qdel 2613763
+
+#Ctrl+C could stop current process.
