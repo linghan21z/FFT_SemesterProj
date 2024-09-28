@@ -98,6 +98,11 @@ git checkout feature
 git push
 
 
+# to see the tree graph of git commit and historical edition
+gitk --all
+# or this will show in command line
+git log --oneline --graph --all --decorate
+
 
 
 
