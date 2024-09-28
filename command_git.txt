@@ -1,0 +1,108 @@
+#######LOCAL REPO WORK######
+
+git commit  # new submit based on parent node
+
+# git branch
+# I want to include the work of this commit and all parent commits
+git branch <name-of-branch>
+git checkout <name-of-branch>
+git commit
+
+git merge <name-of-branch>
+
+git rebase <main>
+
+hash  # click the node
+git checkout bugFix^ # move HEAD to parent node
+git checkout bugFix~3  # move HEAD to last 3 sequencial parent node
+git branch -f main HEAD~3
+git branch -f main c6  # move main to c6
+git checkout c3  # gives HEAD to c3
+
+#Reversing Changes in Git
+
+#undo changes
+undos
+git reset HEAD~1  #doesn't work for remote branches
+git revert HEAD  # In order to reverse changes and share those reversed changes with others
+
+#Moving Work Around
+git cherry-pick <Commit1> <Commit2> <...>
+git cherry-pick c2 c4  # copy these repositories to the following of main
+
+#interactive Ul "-i" can do: reorder
+git rebase -i HEAD~4  # could deal with the parent 4 commits with UI
+
+git rebase -i
+git cherry-pick
+
+git commit --amend  # to make the slight modification
+
+#Git Tags, to mark commits with sth more permanent than a branch
+# tag v1 to commit C1, if leave the commit off, git will just use whatever HEAD is at.
+git tag v1 C1  
+
+git describe <ref>
+#The output of the command looks like: <tag>_<numCommits>_g<hash>  there are <numCommits> away from commit <tag>, and now I'm at <hash>
+
+
+#######REMOTE######
+
+git clone  #create local copies of remote repositories (from github for example), "o/main" is called a remote branch
+#Remote branches are on your local repository, not on the remote repository.
+#naming convention : <remote name>/<branch name>  (example:origin/main)
+
+#like this, if commit on o/main, it will not truly update
+git checkout o/main
+git commit
+#so need to commit on main locally
+git checkout main
+git commit
+
+git fetch
+# 1. downloads the commits that the remote has but are missing from our local repository, 2. updates where our remote branches point (for instance, o/main)
+#git fetch usually talks to the remote repository through the Internet (via a protocol like http:// or git://).
+###not update your main branch or change anything about your local state
+
+git pull
+# fetching remote changes and then merging them
+#it will merge from o/main
+
+#Simulating collaboration
+git fakeTeamwork
+git fakeTeamwork foo 3  #simulated a teammate pushing three commits to the foo branch on our remote.
+
+git push
+#uploading your changes to a specified remote
+#to be synchronous
+
+
+#Diverged Work
+# Method 1.
+git fetch
+git rebase o/main  # or use # git merge o/main
+git push
+# 2.
+git pull --rebase # is shorthand for a fetch and a rebase
+git push
+# 3. 
+git pull   # it will merge history
+git push
+
+#Remote Rejected! need pull request
+#SOLUTION: Create another branch called feature and push that to the remote. Also reset your main back to be in sync with the remote otherwise you may have issues next time you do a pull and someone else's commit conflicts with yours.
+--
+git branch feature
+git reset o/main
+git checkout feature
+git push
+
+
+max 30*15/14=32
+min 25*15/14=27
+
+
+
+
+
+
