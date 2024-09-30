@@ -98,8 +98,12 @@ git checkout feature
 git push
 
 
-max 30*15/14=32
-min 25*15/14=27
+# on Git bash, to see the tree graph of git commit and historical edition
+gitk --all
+# or this will show in command line
+git log --oneline --graph --all --decorate
+
+
 
 
 
