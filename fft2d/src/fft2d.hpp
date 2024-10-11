@@ -87,16 +87,15 @@ std::array<ac_complex<T>, points> TrivialSwap(
 }
 
 // FFT data swap building block associated with complex rotations
-//reorders an array of complex numbers by swapping elements from the first half 
-//with corresponding elements from the second half, in a mirrored fashion.
+//even positions get data from the first half, odd positions get data from the second half
 template <size_t points, typename T>
 std::array<ac_complex<T>, points> Swap(
     std::array<ac_complex<T>, points> data) {
   std::array<ac_complex<T>, points> tmp;
 #pragma unroll
   for (int k = 0; k < (points / 2); k++) {
-    tmp[k + k] = data[k];
-    tmp[points - 1 - k - k] = data[points - 1 - k];
+    tmp[k + k] = data[k];  //Assign even-indexed values
+    tmp[points - 1 - k - k] = data[points - 1 - k]; //Assign mirrored odd-indexed values
   }
   return tmp;
 }
@@ -236,9 +235,9 @@ std::array<ac_complex<T>, points> ComplexRotate(
     std::array<ac_complex<T>, points> data, int index, int stage) {
 #pragma unroll
   for (int group = 0; group < points / 4; group++) { //how many sets of 4 complex numbers exist in the data array
-#pragma unroll
+#pragma unroll        //point=4 or 8,so group=0, or 0,1
     for (int k = 1; k < 4; k++) { //k=1,2,3
-      int stream = group * 3 + k - 1; //=0-1-2; 3-4-5
+      int stream = group * 3 + k - 1; //stream can only be =0-1-2; 3-4-5.
       data[k + group * 4] *= Twiddle<size, points, T>(index, stage, stream);
     } //data[1]-2-3,5-6-7
   }
@@ -301,7 +300,7 @@ std::array<ac_complex<T>, points> FFTStep(
 
     data = Butterfly(data);
 
-    if (complex_stage) {
+    if (complex_stage) { //odd stages 3, 5
       data = ComplexRotate<size>(data, data_index, stage);
     }
 
@@ -313,15 +312,14 @@ std::array<ac_complex<T>, points> FFTStep(
     // Reordering multiplexers must toggle every 'delay' steps
     bool toggle = data_index & delay;
 
-    // Assign unique sections of the buffer for the set of delay elements at
-    // each stage
+    // Assign unique sections of the buffer for the set of delay elements at each stage
     ac_complex<T> *head_buffer = fft_delay_elements + size -
                                  (1 << (logn - stage + kInitStages)) +
                                  points * (stage - kInitStages);
 
     data = ReorderData(data, delay, head_buffer, toggle);
 
-    if (!complex_stage) {
+    if (!complex_stage) { //not odd stages, even 2,4...
       data = TrivialRotate(data);
     }
   }
@@ -329,10 +327,10 @@ std::array<ac_complex<T>, points> FFTStep(
   // Stage logn - 1
   data = Butterfly(data);
 
-// Shift the contents of the sliding window. The hardware is capable of
-// shifting the entire contents in parallel if the loop is unrolled. More
-// important, when unrolling this loop each transfer maps to a trivial
-// loop-carried dependency
+// Shift the contents of the sliding window to accommodate new data. 
+// The hardware is capable of shifting the entire contents in parallel 
+// if the loop is unrolled. More important, when unrolling this loop 
+// each transfer maps to a trivial loop-carried dependency
 #pragma unroll
   for (int ii = 0; ii < size + points * (logn - 2) - 1; ii++) {
     fft_delay_elements[ii] = fft_delay_elements[ii + 1];
@@ -407,6 +405,7 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
       // Local memory for storing 8 rows 
       ac_complex<T> buf[kPoints * kN]; //matrix data is fetched row by row and stored in the buf array.
       for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
+//These are just computing the index or offset need to "read data"
         // Each read fetches 8 matrix points
         int x = (i * kN + work_item) << log_points; //matrix offset for the current work item.
 
@@ -430,8 +429,9 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
           where = x;
           where_global = where;
         }
-
-#pragma unroll //Buffered Data Storage: The data is then read into a local buffer(buf) using the computed memory index
+//Now come to real "read data" operation
+#pragma unroll //Buffered Data Storage: 
+//The data is then read into a local buffer(buf) using the computed memory index
         for (int k = 0; k < kPoints; k++) {
           buf[(where & ((1 << (logn + log_points)) - 1)) + k] =
               src[where_global + k];
@@ -482,14 +482,16 @@ struct FFT {
     //It runs for kN * (kN / kPoints) iterations to process the input data, 
     //followed by kN / kPoints - 1 additional iterations to flush the remaining output data from the pipeline. 
     for (unsigned i = 0; i < kN * (kN / kPoints) + kN / kPoints - 1; i++) { // kN/kPoints determines how many iterations are needed to process all points
-      std::array<ac_complex<T>, kPoints> data;
+      std::array<ac_complex<T>, kPoints> data; //process batch
 
       // Read data from channels (input pipe)
       if (i < kN * (kN / kPoints)) {
         data = PipeIn::read();  //Reading from PipeIn:This retrieves a batch of kPoints FFT points.
       } else { //Padding with zeros: Once all input data has processed, the remaining iterations output zeros, 
         data = std::array<ac_complex<T>, kPoints>{0}; //which allows the pipeline to "drain" (i.e., output the remaining computed results).
-      }
+      }       //Padding with Zeros: Once all the real data has been processed, zeros are fed into the pipeline as padding. 
+              //These zeros don't affect the final FFT result, but they trigger the pipeline to continue processing and push any remaining valid results out of the pipeline.
+              //Flushing the Pipeline: This ensures that the entire pipeline gets emptied, and all valid results are "flushed out" to the output.
 
       // Perform one FFT step
       data = 

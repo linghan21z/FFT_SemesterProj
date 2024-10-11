@@ -248,7 +248,7 @@ void TestFFT(bool mangle, bool inverse) {
     for (int i = 0; i < 2; i++) { //0 to read(Fetch->FFT kernel), 1 to write(FFT->Transpo kernel)
       ac_complex<float> *to_read = i == 0 ? input_data : temp_data;
       ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
-
+      //Implement FFT
       // Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
           Fetch<kLogN, kLogParallelism, FetchToFFT, float>{to_read, mangle});
@@ -264,16 +264,17 @@ void TestFFT(bool mangle, bool inverse) {
       fft_event.wait();
       transpose_event.wait();
 
-      if (i == 0) {  //0 to read(Fetch->FFT kernel)
+      //Time
+      if (i == 0) {  //0 to read(Fetch->FFT kernel) 1st fft start
         start_time = fetch_event.template get_profiling_info<
             sycl::info::event_profiling::command_start>();
-      } else {
+      } else { //1 to transpose and write back(FFT-> Transpose kernel) 2nd fft end
         end_time = transpose_event.template get_profiling_info<
             sycl::info::event_profiling::command_end>();
       }
     }
-
-    double kernel_runtime = (end_time - start_time) / 1.0e9; //ns (unit)
+    //it's the time for twice fft - 2d fft time
+    double kernel_runtime = (end_time - start_time) / 1.0e9; //ns (unit)-> s
 
     // Copy the output data from the USM memory to the host DDR
     q.memcpy(host_output_data, output_data, sizeof(ac_complex<float>) * kN * kN)
@@ -298,7 +299,7 @@ void TestFFT(bool mangle, bool inverse) {
     for (int i = 0; i < kN; i++) {
       FourierTransformGold<kLogN>(host_verify + Coordinates<kN>(i, 0), inverse);
     }
-
+    //transpose and tmp-store-intermidiate-result
     for (int i = 0; i < kN; i++) {
       for (int j = 0; j < kN; j++) {
         host_verify_tmp[Coordinates<kN>(j, i)] =
@@ -317,7 +318,7 @@ void TestFFT(bool mangle, bool inverse) {
             host_verify_tmp[Coordinates<kN>(i, j)];
       }
     }
-
+    //SNR
     double magnitude_sum = 0;
     double noise_sum = 0;
     for (int i = 0; i < kN; i++) {
@@ -395,7 +396,7 @@ void FourierTransformGold(ac_complex<double> *data, bool inverse) {
   }
 }
 
-//implements a recursive step of the FFT
+//implements a recursive step of the FT
 //recursively breaking down the input data into smaller arrays, processing them, and combining the results. 
 template <int lognr_points>
 void FourierStage(ac_complex<double> *data) {
@@ -422,8 +423,8 @@ void FourierStage(ac_complex<double> *data) {
     FourierStage<lognr_points - 1>(half2); //until kNrPoints = 1 << 1 =2,smallest 2*2 matrix
 
     for (int i = 0; i < kNrPoints / 2; i++) {
-      data[i].r() = half1[i].r() +
-                    cos(2 * M_PI * i / kNrPoints) * half2[i].r() +
+      data[i].r() = half1[i].r() + 
+                    cos(2 * M_PI * i / kNrPoints) * half2[i].r() + //+是因为是对乘积的实部进行加，已经带负号了
                     sin(2 * M_PI * i / kNrPoints) * half2[i].i();
       data[i].i() = half1[i].i() -
                     sin(2 * M_PI * i / kNrPoints) * half2[i].r() +
