@@ -1,0 +1,10 @@
+<!-- to compile  -->
+g++ -std=c++11 fft1d_recursive.cpp -o fft1d_recursive.exe
+
+<!-- g++ is the compiler.
+-std=c++11 specifies that you are using C++11 standard.
+fft1d_recursive.cpp is the name of your C++ source file.
+-o fft1d_recursive.exe specifies the output executable file name as fft1d_recursive.exe -->
+
+<!-- then run -->
+./fft1d_recursive.exe
