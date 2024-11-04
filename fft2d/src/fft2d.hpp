@@ -250,11 +250,10 @@ std::array<ac_complex<T>, points> ComplexRotate(
 // starting with invocation N /points - 1 (outputs are delayed). Multiple
 // back-to-back transforms can be executed
 //
-// 'data' encapsulates points complex single-precision floating-point input
-// points 'step' specifies the index of the current invocation
-// 'fft_delay_elements' is an array representing a sliding window of size
-// N+points*(log(N)-2) 'inverse' toggles between the direct and inverse
-// transform
+// 'data' encapsulates points complex single-precision floating-point input points 
+// 'step' specifies the index of the current invocation
+// 'fft_delay_elements' is an array representing a sliding window of size N+points*(log(N)-2) 
+// 'inverse' toggles between the direct and inverse transform
 template <int logn, size_t points, typename T>
 std::array<ac_complex<T>, points> FFTStep(
     std::array<ac_complex<T>, points> data, int step,
@@ -295,7 +294,7 @@ std::array<ac_complex<T>, points> FFTStep(
 
     // Figure out the index of the element processed at this stage
     // Subtract (add modulo size / 8) the delay incurred as data travels
-    // from one stage to the next
+    // from one stage to the next, step=i % (kN / kPoints) can be 0-1-2-3
     int data_index = (step + (1 << (logn - 1 - stage))) & (size / points - 1);
 
     data = Butterfly(data);
@@ -313,6 +312,9 @@ std::array<ac_complex<T>, points> FFTStep(
     bool toggle = data_index & delay;
 
     // Assign unique sections of the buffer for the set of delay elements at each stage
+    //KN=32, Kpoints=8,
+    //stage=2,*head_buffer = fft_delay_elements
+    //stage=3,*head_buffer = fft_delay_elements+24
     ac_complex<T> *head_buffer = fft_delay_elements + size -
                                  (1 << (logn - stage + kInitStages)) +
                                  points * (stage - kInitStages);
@@ -432,8 +434,8 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
 //Now come to real "read data" operation
 #pragma unroll //Buffered Data Storage: 
 //The data is then read into a local buffer(buf) using the computed memory index
-        for (int k = 0; k < kPoints; k++) {
-          buf[(where & ((1 << (logn + log_points)) - 1)) + k] =
+        for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
+          buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
               src[where_global + k];
         }
       }
@@ -500,7 +502,7 @@ struct FFT {
           //fft_delay_elements sliding window handles data storage and shifts across iterations.
       
       // Write result to channels (output pipe)
-      if (i >= kN / kPoints - 1) { //write data after i reaches kN/kPoints - 1,
+      if (i >= kN / kPoints - 1) { //write data after i reaches kN/kPoints - 1, =3
         PipeOut::write(data); //ensures all necessary FFT steps for each batch have been completed before the output is sent.
       }
     }
