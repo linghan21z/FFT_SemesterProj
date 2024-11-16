@@ -389,8 +389,9 @@ int MangleBits(int x) {
 /* This kernel reads the matrix data and provides "1<<log_points" data to the
  * FFT engine. （fetches multiple rows of matrix data in parallel）
  */
-template <int logn, size_t log_points, typename PipeOut0, 
-          typename PipeOut1, typename PipeOut2, typename PipeOut3, typename T>
+template <int logn, size_t log_points, 
+          typename PipeOut0, typename PipeOut1, typename PipeOut2, typename PipeOut3, 
+          typename T>
 struct Fetch { //reading matrix data from memory and sending the fetched data to FFT engine using a data pipeline
   ac_complex<T> *src;
   int mangle; //The mangle flag controls whether to use an optimized memory layout
@@ -443,8 +444,11 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         }
       }
 
-      for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
-        int row = work_item >> (logn - log_points);
+      //Above is buf[] = src[]
+      //Below is to_pipe[] = buf[]
+      for (int work_item = 0; work_item < (kWorkGroupSize>>2); work_item++) {//work_item reduce by 4 times,as 4 pipes
+        // int row = work_item >> (logn - log_points);
+        int row = (work_item < (kWorkGroupSize>>3)) ? 0 : 4;//kPoints=8
         int col = work_item & (kN / kPoints - 1);
 
         // Stream fetched data over 8 channels to the FFT engine
@@ -452,10 +456,15 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         std::array<ac_complex<T>, kPoints> to_pipe0, to_pipe1, to_pipe2, to_pipe3; //sent to the FFT engine in chunks
 #pragma unroll
         for (int k = 0; k < kPoints; k++) { //Each chunk contains kPoints data points
-          to_pipe[k] =
-              buf[row * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe0[k] = buf[row * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe1[k] = buf[(row + 1) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe2[k] = buf[(row + 2) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe3[k] = buf[(row + 3) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
         } //data is bit-reversed before being written to the PipeOut pipe
-        PipeOut::write(to_pipe);
+        PipeOut0::write(to_pipe0);
+        PipeOut1::write(to_pipe1);
+        PipeOut2::write(to_pipe2);
+        PipeOut3::write(to_pipe3);
       }         //writing data to a pipe in an Intel FPGA kernel, part of the SYCL (DPC++) programming model.
     }   //PipeOut is likely an output pipe that sends data from the current kernel (the Fetch kernel) to another kernel
   }     //pipe buffer acts as a FIFO queue that can be consumed by another kernel 
@@ -464,7 +473,9 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
 /* The FFT engine
  * 'inverse' toggles between the direct and the inverse transform
  */ //Compute FFT in a streaming fashion using pipes for data input and output
-template <int logn, size_t log_points, typename PipeIn, typename PipeOut,
+template <int logn, size_t log_points, 
+          typename PipeIn0, typename PipeIn1, typename PipeIn2, typename PipeIn3,
+          typename PipeOut0, typename PipeOut1, typename PipeOut2, typename PipeOut3,
           typename T>   //log_points: num of points processed in each step (batch size).
 struct FFT {
   int inverse;
@@ -481,32 +492,46 @@ struct FFT {
      * array)are simple transfers between adjacent array elements
      */
 
-    ac_complex<T> fft_delay_elements[kN + kPoints * (logn - 2)]; //sliding window for data reordering
+    ac_complex<T> fft_delay_elements0[kN + kPoints * (logn - 2)]; //sliding window for data reordering
                                             //The logn - 2 portion relates to the stages of FFT pipeline that require reordering.
+    ac_complex<T> fft_delay_elements1[kN + kPoints * (logn - 2)];
+    ac_complex<T> fft_delay_elements2[kN + kPoints * (logn - 2)];
+    ac_complex<T> fft_delay_elements3[kN + kPoints * (logn - 2)];
     // needs to run "kN / kPoints - 1" additional iterations to drain the last outputs
     //It runs for kN * (kN / kPoints) iterations to process the input data, 
     //followed by kN / kPoints - 1 additional iterations to flush the remaining output data from the pipeline. 
-    for (unsigned i = 0; i < kN * (kN / kPoints) + kN / kPoints - 1; i++) { // kN/kPoints determines how many iterations are needed to process all points
-      std::array<ac_complex<T>, kPoints> data; //process batch
+    for (unsigned i = 0; i < kN * (kN / kPoints) / 4 + kN / kPoints - 1; i++) { // kN/kPoints determines how many iterations are needed to process all points
+      std::array<ac_complex<T>, kPoints> data0, data1, data2, data3; //process batch
 
       // Read data from channels (input pipe)
-      if (i < kN * (kN / kPoints)) {
-        data = PipeIn::read();  //Reading from PipeIn:This retrieves a batch of kPoints FFT points.
+      if (i < kN * (kN / kPoints) / 4) {
+        data0 = PipeIn0::read();  //Reading from PipeIn:This retrieves a batch of kPoints FFT points.
+        data1 = PipeIn1::read();
+        data2 = PipeIn2::read();
+        data3 = PipeIn3::read();
       } else { //Padding with zeros: Once all input data has processed, the remaining iterations output zeros, 
-        data = std::array<ac_complex<T>, kPoints>{0}; //which allows the pipeline to "drain" (i.e., output the remaining computed results).
+        data0 = std::array<ac_complex<T>, kPoints>{0}; //which allows the pipeline to "drain" (i.e., output the remaining computed results).
+        data1 = std::array<ac_complex<T>, kPoints>{0};
+        data2 = std::array<ac_complex<T>, kPoints>{0};
+        data3 = std::array<ac_complex<T>, kPoints>{0};
       }       //Padding with Zeros: Once all the real data has been processed, zeros are fed into the pipeline as padding. 
               //These zeros don't affect the final FFT result, but they trigger the pipeline to continue processing and push any remaining valid results out of the pipeline.
               //Flushing the Pipeline: This ensures that the entire pipeline gets emptied, and all valid results are "flushed out" to the output.
 
       // Perform one FFT step
-      data = 
-          FFTStep<logn>(data, i % (kN / kPoints), fft_delay_elements, inverse);
+      data0 = FFTStep<logn>(data0, i % (kN / kPoints), fft_delay_elements0, inverse);
+      data1 = FFTStep<logn>(data1, i % (kN / kPoints), fft_delay_elements1, inverse);
+      data2 = FFTStep<logn>(data2, i % (kN / kPoints), fft_delay_elements2, inverse);
+      data3 = FFTStep<logn>(data3, i % (kN / kPoints), fft_delay_elements3, inverse);
           //i%(kN / kPoints) provides the current index within the current FFT block, 
           //fft_delay_elements sliding window handles data storage and shifts across iterations.
       
       // Write result to channels (output pipe)
       if (i >= kN / kPoints - 1) { //write data after i reaches kN/kPoints - 1, =3
-        PipeOut::write(data); //ensures all necessary FFT steps for each batch have been completed before the output is sent.
+        PipeOut0::write(data0); //ensures all necessary FFT steps for each batch have been completed before the output is sent.
+        PipeOut1::write(data1);
+        PipeOut2::write(data2);
+        PipeOut3::write(data3);
       }
     }
   }
@@ -519,7 +544,9 @@ struct FFT {
  * using the alternative matrix format, consecutive rows are closer in memory,
  * and this is also beneficial for higher memory access efficiency
  */
-template <int logn, size_t log_points, typename PipeIn, typename T>
+template <int logn, size_t log_points, 
+          typename PipeIn0, typename PipeIn1, typename PipeIn2, typename PipeIn3,
+          typename T>
 struct Transpose {
 #if defined IS_BSP  //the #if-else-endif used for conditional compilation
   ac_complex<T> *dest;
@@ -552,17 +579,28 @@ struct Transpose {
     for (int t = 0; t < kIterations; t++) {
       //Data Buffering
       ac_complex<T> buf[kPoints * kN]; //The kernel buffers(local array) kPoints rows of FFT results at a time,before being written to the output.
-      for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
+      for (int work_item = 0; work_item < (kWorkGroupSize >> 2); work_item++) {
         //Reading Data from Pipe
-        std::array<ac_complex<T>, kPoints> from_pipe = PipeIn::read(); //reads kPoints complex numbers from the input pipe,correspond to one row of FFT output data.
+        std::array<ac_complex<T>, kPoints> from_pipe0 = PipeIn0::read(); //reads kPoints complex numbers from the input pipe,correspond to one row of FFT output data.
+        std::array<ac_complex<T>, kPoints> from_pipe1 = PipeIn1::read();
+        std::array<ac_complex<T>, kPoints> from_pipe2 = PipeIn2::read();
+        std::array<ac_complex<T>, kPoints> from_pipe3 = PipeIn3::read();
 
+        int w_i_offset = (work_item < (kWorkGroupSize / kPoints)) ? (work_item) : (work_item + 3*(kN/kPoints));
+        int w_i_col = kN / kPoints;
 #pragma unroll
         for (int k = 0; k < kPoints; k++) {
           //Buffering the Read Data
-          buf[kPoints * work_item + k] = from_pipe[k]; 
+          buf[kPoints *  w_i_offset + k] = from_pipe0[k]; 
+          buf[kPoints * (w_i_offset + w_i_col) + k] = from_pipe1[k]; 
+          buf[kPoints * (w_i_offset + 2 * w_i_col) + k] = from_pipe2[k]; 
+          buf[kPoints * (w_i_offset + 3 * w_i_col) + k] = from_pipe3[k];           
+          
         }//Each row stored in local buf, with consecutive rows stacked vertically in memory.
       }
 
+      //This part does not need any change, just store dest[]=buf[kPoints*kN] same as before
+      //similar to "Fetch", buf[]=src[], no change
       for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
         //Transpose Logic
         int colt = work_item; //colt (column index)

@@ -238,11 +238,30 @@ void TestFFT(bool mangle, bool inverse) {
     static_assert(kN / kParallelism >= kParallelism); 
 
     // Kernel to kernel pipes
-    using FetchToFFT =
-        sycl::ext::intel::pipe<class FetchToFFTPipe,
+    using FetchToFFT0 = 
+        sycl::ext::intel::pipe<class FetchToFFTPipe0,
                                std::array<ac_complex<float>, kParallelism>, 0>;
-    using FFTToTranspose =
-        sycl::ext::intel::pipe<class FFTToTransposePipe,
+    using FetchToFFT1 = 
+        sycl::ext::intel::pipe<class FetchToFFTPipe1, 
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+    using FetchToFFT2 = 
+        sycl::ext::intel::pipe<class FetchToFFTPipe2, 
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+    using FetchToFFT3 = 
+        sycl::ext::intel::pipe<class FetchToFFTPipe3, 
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+                           
+    using FFTToTranspose0 =
+        sycl::ext::intel::pipe<class FFTToTransposePipe0,
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+    using FFTToTranspose1 = 
+        sycl::ext::intel::pipe<class FFTToTransposePipe1, 
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+    using FFTToTranspose2 = 
+        sycl::ext::intel::pipe<class FFTToTransposePipe2, 
+                               std::array<ac_complex<float>, kParallelism>, 0>;
+    using FFTToTranspose3 = 
+        sycl::ext::intel::pipe<class FFTToTransposePipe3, 
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
     for (int i = 0; i < 2; i++) { //0 to read(Fetch->FFT kernel), 1 to write(FFT->Transpo kernel)
@@ -251,15 +270,17 @@ void TestFFT(bool mangle, bool inverse) {
       //Implement FFT
       // Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
-          Fetch<kLogN, kLogParallelism, FetchToFFT, float>{to_read, mangle});
+          Fetch<kLogN, kLogParallelism, 
+                FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, float>{to_read, mangle});
 
       auto fft_event = q.single_task<class FFTKernel>(
-          FFT<kLogN, kLogParallelism, FetchToFFT, FFTToTranspose, float>{
-              inverse});
+          FFT<kLogN, kLogParallelism, 
+              FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+              FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3, float>{inverse});
 
       auto transpose_event = q.single_task<class TransposeKernel>(
-          Transpose<kLogN, kLogParallelism, FFTToTranspose, float>{to_write,
-                                                                   mangle});
+          Transpose<kLogN, kLogParallelism, 
+                    FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3, float>{to_write, mangle});
 
       fft_event.wait();
       transpose_event.wait();
