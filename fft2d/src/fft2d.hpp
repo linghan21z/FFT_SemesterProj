@@ -266,7 +266,8 @@ std::array<ac_complex<T>, points> FFTStep(
   }
 
   // Stage 0 of feed-forward FFT
-  data = Butterfly(data);
+  data = Butterfly(data); //stage 0 finished
+
   data = TrivialRotate(data);
   data = TrivialSwap(data);
 
@@ -274,7 +275,8 @@ std::array<ac_complex<T>, points> FFTStep(
   constexpr int kInitStages = points == 8 ? 2 : 1;
   if constexpr (points == 8) {
     // Stage 1
-    data = Butterfly(data);
+    data = Butterfly(data); //stage 1 finished
+
     data = ComplexRotate<size>(data, step & (size / points - 1), 1);
     data = Swap(data);
 

@@ -1,0 +1,179 @@
+[zhao@eslsrv2 build]$ make fpga_emu
+[ 33%] To compile manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -I../../../include -fsycl -fintelfpga -Wall -qactypes -DLOGN=5 -DPARALLELISM=8 -DFPGA_EMULATOR -c ../src/fft2d_demo.cpp -o CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+
+To link manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -fsycl -fintelfpga -qactypes -DLOGN=5 -DPARALLELISM=8 -o fft2d.fpga_emu CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+[ 33%] Built target displayEmulationCompileCommands
+[ 66%] Building CXX object CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:238:19: error: static assertion failed due to requirement 'kN / kParallelism >= kParallelism'
+  238 |     static_assert(kN / kParallelism >= kParallelism); 
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:238:37: note: expression evaluates to '4 >= 8'
+  238 |     static_assert(kN / kParallelism >= kParallelism);
+      |                   ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~
+In file included from /home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:11:
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:468:9: error: no matching function for call to 'write'
+  468 |         PipeOut::write(to_pipe); //pipeout 32 bits
+      |         ^~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1602:5: note: in instantiation of member function 'Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>::operator()' requested here
+ 1602 |     KernelFunc();
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1711:10: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1711 |       h->kernel_single_task<TypesToForward..., Props...>(Args...);
+      |          ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1789:29: note: in instantiation of function template specialization 'sycl::handler::KernelPropertiesUnpackerImpl<>::kernel_single_task_unpack<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1789 |           Unpacker.template kernel_single_task_unpack<KernelName, KernelType>(
+      |                             ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1786:5: note: in instantiation of function template specialization 'sycl::handler::unpack<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>, false, (lambda at /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1788:21)>' requested here
+ 1786 |     unpack<KernelName, KernelType, PropertiesT,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1840:5: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task_wrapper<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 1840 |     kernel_single_task_wrapper<NameT, KernelType, PropertiesT>(KernelFunc);
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:2495:5: note: in instantiation of function template specialization 'sycl::handler::single_task_lambda_impl<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2495 |     single_task_lambda_impl<KernelName, KernelType, PropertiesT>(Props,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2032:24: note: in instantiation of function template specialization 'sycl::handler::single_task<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2032 |           CGH.template single_task<KernelName, KernelType, PropertiesT>(
+      |                        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2046:12: note: in instantiation of function template specialization 'sycl::queue::single_task<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2046 |     return single_task<KernelName, KernelType>(
+      |            ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:253:28: note: in instantiation of function template specialization 'sycl::queue::single_task<FetchKernel, Fetch<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+  253 |       auto fetch_event = q.single_task<class FetchKernel>(
+      |                            ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/ext/intel/pipes.hpp:83:15: note: candidate function not viable: no known conversion from 'array<[...], 4 * kPoints aka 32>' to 'const array<[...], 8>' for 1st argument
+   83 |   static void write(const _dataT &_Data) {
+      |               ^     ~~~~~~~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/ext/intel/pipes.hpp:47:15: note: candidate function not viable: requires 2 arguments, but 1 was provided    
+   47 |   static void write(const _dataT &_Data, bool &_Success) {
+      |               ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:11:
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:507:14: error: no viable overloaded '='
+  507 |         data = PipeIn::read();  //Reading from PipeIn:This retrieves a batch of kPoints FFT points.
+      |         ~~~~ ^ ~~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1602:5: note: in instantiation of member function 'FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>::operator()' requested here
+ 1602 |     KernelFunc();
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1711:10: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1711 |       h->kernel_single_task<TypesToForward..., Props...>(Args...);
+      |          ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1789:29: note: in instantiation of function template specialization 'sycl::handler::KernelPropertiesUnpackerImpl<>::kernel_single_task_unpack<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1789 |           Unpacker.template kernel_single_task_unpack<KernelName, KernelType>(
+      |                             ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1786:5: note: in instantiation of function template specialization 'sycl::handler::unpack<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>, false, (lambda at /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1788:21)>' requested here
+ 1786 |     unpack<KernelName, KernelType, PropertiesT,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1840:5: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task_wrapper<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 1840 |     kernel_single_task_wrapper<NameT, KernelType, PropertiesT>(KernelFunc);
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:2495:5: note: in instantiation of function template specialization 'sycl::handler::single_task_lambda_impl<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2495 |     single_task_lambda_impl<KernelName, KernelType, PropertiesT>(Props,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2032:24: note: in instantiation of function template specialization 'sycl::handler::single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2032 |           CGH.template single_task<KernelName, KernelType, PropertiesT>(
+      |                        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2046:12: note: in instantiation of function template specialization 'sycl::queue::single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2046 |     return single_task<KernelName, KernelType>(
+      |            ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:256:26: note: in instantiation of function template specialization 'sycl::queue::single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+  256 |       auto fft_event = q.single_task<class FFTKernel>(
+      |                          ^
+/usr/lib/gcc/x86_64-redhat-linux/11/../../../../include/c++/11/array:95:12: note: candidate function (the implicit copy assignment operator) not viable: no known conversion from 'array<[...], 8>' to 'const array<[...], 32>' for 1st argument
+   95 |     struct array
+      |            ^~~~~
+/usr/lib/gcc/x86_64-redhat-linux/11/../../../../include/c++/11/array:95:12: note: candidate function (the implicit move assignment operator) not viable: no known conversion from 'array<[...], 8>' to 'array<[...], 32>' for 1st argument
+   95 |     struct array
+      |            ^~~~~
+In file included from /home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:11:
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:539:9: error: no matching function for call to 'write'
+  539 |         PipeOut::write(data); //ensures all necessary FFT steps for each batch have been completed before the output is sent.
+      |         ^~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/ext/intel/pipes.hpp:83:15: note: candidate function not viable: no known conversion from 'array<[...], 4 * kPoints aka 32>' to 'const array<[...], 8>' for 1st argument
+   83 |   static void write(const _dataT &_Data) {
+      |               ^     ~~~~~~~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/ext/intel/pipes.hpp:47:15: note: candidate function not viable: requires 2 arguments, but 1 was provided    
+   47 |   static void write(const _dataT &_Data, bool &_Success) {
+      |               ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:11:
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:587:48: error: no viable conversion from 'array<[...], 8>' to 'array<[...], kPoints * 4 aka 32>'
+  587 |         std::array<ac_complex<T>, kPoints * 4> from_pipe = PipeIn::read(); //reads kPoints complex numbers from the input pipe,correspond to one row of FFT output data.
+      |                                                ^           ~~~~~~~~~~~~~~
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1602:5: note: in instantiation of member function 'Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>::operator()' requested here
+ 1602 |     KernelFunc();
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1711:10: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1711 |       h->kernel_single_task<TypesToForward..., Props...>(Args...);
+      |          ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1789:29: note: in instantiation of function template specialization 'sycl::handler::KernelPropertiesUnpackerImpl<>::kernel_single_task_unpack<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+ 1789 |           Unpacker.template kernel_single_task_unpack<KernelName, KernelType>(
+      |                             ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1786:5: note: in instantiation of function template specialization 'sycl::handler::unpack<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>, false, (lambda at /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1788:21)>' requested here
+ 1786 |     unpack<KernelName, KernelType, PropertiesT,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1840:5: note: in instantiation of function template specialization 'sycl::handler::kernel_single_task_wrapper<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 1840 |     kernel_single_task_wrapper<NameT, KernelType, PropertiesT>(KernelFunc);
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:2495:5: note: in instantiation of function template specialization 'sycl::handler::single_task_lambda_impl<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2495 |     single_task_lambda_impl<KernelName, KernelType, PropertiesT>(Props,
+      |     ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2032:24: note: in instantiation of function template specialization 'sycl::handler::single_task<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2032 |           CGH.template single_task<KernelName, KernelType, PropertiesT>(
+      |                        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:2046:12: note: in instantiation of function template specialization 'sycl::queue::single_task<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>, sycl::ext::oneapi::experimental::properties<std::tuple<>>>' requested here
+ 2046 |     return single_task<KernelName, KernelType>(
+      |            ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:260:32: note: in instantiation of function template specialization 'sycl::queue::single_task<TransposeKernel, Transpose<5, 3, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>' requested here
+  260 |       auto transpose_event = q.single_task<class TransposeKernel>(
+      |                                ^
+/usr/lib/gcc/x86_64-redhat-linux/11/../../../../include/c++/11/array:95:12: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'std::array<ac_complex<float>, 8>' to 'const array<ac_complex<float>, 32> &' for 1st argument
+   95 |     struct array
+      |            ^~~~~
+/usr/lib/gcc/x86_64-redhat-linux/11/../../../../include/c++/11/array:95:12: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'std::array<ac_complex<float>, 8>' to 'array<ac_complex<float>, 32> &&' for 1st argument
+   95 |     struct array
+      |            ^~~~~
+In file included from /home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d_demo.cpp:6:
+In file included from /opt/intel/oneapi/compiler/2025.0/opt/oclfpga/include/sycl/ext/intel/ac_types/ac_complex.hpp:53:
+In file included from /opt/intel/oneapi/compiler/2025.0/opt/oclfpga/include/sycl/ext/intel/ac_types/ac_fixed.hpp:49:
+In file included from /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/sycl.hpp:25:
+In file included from /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/detail/core.hpp:23:
+In file included from /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/queue.hpp:35:
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1602:5: error: SYCL kernel cannot call an undefined function without SYCL_EXTERNAL attribute    
+ 1602 |     KernelFunc();
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+  484 |   void operator()() const {
+      |        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1600:29: note: called by 'kernel_single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>'
+ 1600 |   __SYCL_KERNEL_ATTR__ void kernel_single_task(_KERNELFUNCPARAM(KernelFunc)) {
+      |                             ^
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+  484 |   void operator()() const {
+      |        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1600:29: note: called by 'kernel_single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>'
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+  484 |   void operator()() const {
+      |        ^
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+      |     ^
+      |     ^
+      |     ^
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+      |     ^
+/home/zhao/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/ReferenceDesigns/fft2d_version1/src/fft2d.hpp:484:8: note: 'operator()' declared here
+  484 |   void operator()() const {
+      |        ^
+/opt/intel/oneapi/compiler/2025.0/bin/compiler/../../include/sycl/handler.hpp:1600:29: note: called by 'kernel_single_task<FFTKernel, FFT<5, 3, sycl::ext::intel::pipe<FetchToFFTPipe, std::array<ac_complex<float>, 8>>, sycl::ext::intel::pipe<FFTToTransposePipe, std::array<ac_complex<float>, 8>>, float>>'
+ 1600 |   __SYCL_KERNEL_ATTR__ void kernel_single_task(_KERNELFUNCPARAM(KernelFunc)) {
+      |                             ^
+6 errors generated.
+make[3]: *** [CMakeFiles/fpga_emu.dir/build.make:76: CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o] Error 1
+make[2]: *** [CMakeFiles/Makefile2:90: CMakeFiles/fpga_emu.dir/all] Error 2
+make[1]: *** [CMakeFiles/Makefile2:97: CMakeFiles/fpga_emu.dir/rule] Error 2
+make: *** [Makefile:124: fpga_emu] Error 2
+[zhao@eslsrv2 build]$
