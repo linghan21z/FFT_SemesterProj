@@ -1,0 +1,72 @@
+[zhao@eslsrv2 build]$ make fpga_emu
+[ 33%] To compile manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -I../../../include -fsycl -fintelfpga -Wall -qactypes -DLOGN=6 -DPARALLELISM=8 -DFPGA_EMULATOR -c ../src/fft2d_demo.cpp -o CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+
+To link manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -fsycl -fintelfpga -qactypes -DLOGN=6 -DPARALLELISM=8 -o fft2d.fpga_emu CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+[ 33%] Built target displayEmulationCompileCommands
+[ 66%] Building CXX object CMakeFiles/fpga_emu.dir/src/fft2d_demo.cpp.o
+[100%] Linking CXX executable fft2d.fpga_emu
+[100%] Built target fpga_emu
+[zhao@eslsrv2 build]$ ls
+CMakeCache.txt  CMakeFiles  cmake_install.cmake  fft2d.fpga_emu  Makefile
+[zhao@eslsrv2 build]$ ./fft2d.fpga_emu 
+No program argument was passed, running all fft2d variants
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (ordered data layout)
+Processing time = 0.00133862s
+Throughput = 0.00305986 Gpoints / sec (0.183591 Gflops)
+Signal to noise ratio on output sample: 140.245
+ --> PASSED
+Running on device: Intel(R) FPGA Emulation Device
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Launching a 4096 points 8-parallel inverse FFT transform (ordered data layout)
+Processing time = 0.000843008s
+Throughput = 0.00485879 Gpoints / sec (0.291527 Gflops)
+Signal to noise ratio on output sample: 140.019
+ --> PASSED
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (alternative data layout)
+Processing time = 0.00100685s
+Throughput = 0.00406814 Gpoints / sec (0.244088 Gflops)
+Signal to noise ratio on output sample: 139.168
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (alternative data layout)
+Processing time = 0.00100685s
+Throughput = 0.00406814 Gpoints / sec (0.244088 Gflops)
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (alternative data layout)
+Processing time = 0.00100685s
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (alternative data layout)
+Using USM device allocations
+Using USM device allocations
+Launching a 4096 points 8-parallel FFT transform (alternative data layout)
+Processing time = 0.00100685s
+Throughput = 0.00406814 Gpoints / sec (0.244088 Gflops)
+Signal to noise ratio on output sample: 139.168
+ --> PASSED
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Launching a 4096 points 8-parallel inverse FFT transform (alternative data layout)
+Processing time = 0.000798464s
+Throughput = 0.00512985 Gpoints / sec (0.307791 Gflops)
+Signal to noise ratio on output sample: 140.015
+ --> PASSED
+[zhao@eslsrv2 build]$ make report
+[ 33%] To compile manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -I../../../include -fsycl -fintelfpga -Wall -qactypes -DLOGN=6 -DPARALLELISM=8 -DFPGA_HARDWARE -c ../src/fft2d_demo.cpp -o CMakeFiles/report.dir/src/fft2d_demo.cpp.o
+
+To link manually:
+/opt/intel/oneapi/compiler/2025.0/bin/icpx -fsycl -fintelfpga -DLOGN=6 -DPARALLELISM=8 -Xshardware -Xstarget=Stratix10 -fsycl-link=early -o fft2d.report CMakeFiles/report.dir/src/fft2d_demo.cpp.o
+[ 33%] Built target displayReportCompileCommands
+[ 66%] Building CXX object CMakeFiles/report.dir/src/fft2d_demo.cpp.o
+[100%] Linking CXX executable fft2d.report
+[100%] Built target report
+[zhao@eslsrv2 build]$ ls
+CMakeCache.txt  CMakeFiles  cmake_install.cmake  fft2d.fpga_emu  fft2d.report  fft2d.report.prj  Makefile
+[zhao@eslsrv2 build]$
