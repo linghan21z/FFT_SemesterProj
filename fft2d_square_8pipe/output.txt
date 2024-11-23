@@ -1,0 +1,16 @@
+[zhao@eslsrv2 build]$ ./fft2d.fpga_emu 
+No program argument was passed, running all fft2d variants
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Launching a 1048576 points 8-parallel FFT transform (ordered data layout)
+Processing time = 0.109714s
+Throughput = 0.00955737 Gpoints / sec (0.955737 Gflops)
+Signal to noise ratio on output sample: 137.348
+ --> PASSED
+Running on device: Intel(R) FPGA Emulation Device
+Using USM device allocations
+Launching a 1048576 points 8-parallel inverse FFT transform (ordered data layout)
+Processing time = 0.179027s
+Throughput = 0.00585707 Gpoints / sec (0.585707 Gflops)
+Signal to noise ratio on output sample: 136.969
+ --> PASSED
