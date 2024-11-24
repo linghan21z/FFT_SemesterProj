@@ -412,7 +412,8 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
       for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
 //These are just computing the index or offset need to "read data"
         // Each read fetches 8 matrix points
-        int x = (i * kN + work_item) << log_points; //matrix offset for the current work item.
+        // int x = (i * kN + work_item) << log_points; //matrix offset for the current work item.
+        int x = (i * kN + work_item) << 2; //modify to fetch 4 points per work_item
 
         /* When using the alternative memory layout, each row consists of a set
          * of segments placed far apart in memory. Instead of reading all
@@ -427,12 +428,15 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
 //Now come to real "read data" operation
 #pragma unroll //Buffered Data Storage: 
 //The data is then read into a local buffer(buf) using the computed memory index
-        for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
+        // for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
+        for (int k = 0; k < 4; k++) { //modify to fetch 4 points per work_item
           buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
               src[where_global + k];
         }
       }
-
+      
+      //Above is buf[] = src[]
+      //Below is to_pipe[] = buf[]
       for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
         int row = work_item >> (logn - log_points);
         int col = work_item & (kN / kPoints - 1);
