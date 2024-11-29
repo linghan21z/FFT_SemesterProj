@@ -134,7 +134,8 @@ void TestFFT(bool inverse) {
     }
 
     // Device memory
-    ac_complex<float> *input_data;
+    ac_complex<float> *input_data_0;
+    ac_complex<float> *input_data_1;
     ac_complex<float> *output_data;
     ac_complex<float> *temp_data;
 
@@ -147,18 +148,28 @@ void TestFFT(bool inverse) {
 #else
       // In the SYCL HLS flow, we need to define the memory interface.
       // For that we need to assign a location to the memory being accessed.
-      auto prop_list = sycl::property_list{
+      auto pl0 = sycl::property_list{
+          sycl::ext::intel::experimental::property::usm::buffer_location(0)};
+      auto pl1 = sycl::property_list{
           sycl::ext::intel::experimental::property::usm::buffer_location(1)};
+      auto pl2 = sycl::property_list{
+          sycl::ext::intel::experimental::property::usm::buffer_location(2)};
+      auto pl3 = sycl::property_list{
+          sycl::ext::intel::experimental::property::usm::buffer_location(3)};
+      auto pl4 = sycl::property_list{
+          sycl::ext::intel::experimental::property::usm::buffer_location(4)};
 #endif
 
-      input_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q);
-      output_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
-      temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);      
-
+      input_data_0 = sycl::malloc_host<ac_complex<float>>(kN * kN / 2, q, pl0);
+      input_data_1 = sycl::malloc_host<ac_complex<float>>(kN * kN / 2, q, pl1);
+      output_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, pl2);
+      temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, pl3);      
+    //-----------------------
     } else if (q.get_device().has(sycl::aspect::usm_device_allocations)) {
       std::cout << "Using USM device allocations" << std::endl;
       // Allocate FPGA DDR memory.
-      input_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
+      input_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      input_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
       output_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
       temp_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
     } else {
@@ -168,7 +179,7 @@ void TestFFT(bool inverse) {
       std::terminate();
     }
 
-    if (input_data == nullptr || output_data == nullptr ||
+    if (input_data_0 == nullptr || input_data_1 == nullptr || output_data == nullptr ||
         temp_data == nullptr) {
       std::cerr << "Failed to allocate USM memory." << std::endl;
       std::terminate();
@@ -176,8 +187,10 @@ void TestFFT(bool inverse) {
 
     // Copy the input data from host DDR to USM memory
     //host-to-device transfer(if Using USM device allocations)
-    q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN)
-        .wait();
+    // q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN).wait();
+    q.memcpy(input_data_0, host_input_data, sizeof(ac_complex<float>) * kN * kN / 2).wait();    // First half
+    q.memcpy(input_data_1, host_input_data + kN * kN / 2, sizeof(ac_complex<float>) * kN * kN / 2).wait(); // Second half
+
 
     std::cout << "Launching a " << kN * kN << " points " << kParallelism
               << "-parallel " << (inverse ? "inverse " : "")
@@ -239,13 +252,14 @@ void TestFFT(bool inverse) {
         sycl::ext::intel::pipe<class FFTToTransposePipe,
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
-    for (int i = 0; i < 2; i++) { //0 to read(Fetch->FFT kernel), 1 to write(FFT->Transpo kernel)
-      ac_complex<float> *to_read = i == 0 ? input_data : temp_data;
+    for (int i = 0; i < 2; i++) { //read(->Fetch), write(Transpo kernel->)
+      ac_complex<float> *to_read_0 = i == 0 ? input_data_0 : temp_data;
+      ac_complex<float> *to_read_1 = i == 0 ? input_data_1 : (temp_data + kN * kN / 2);
       ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
       //Implement FFT
       // Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
-          Fetch<kLogN, kLogParallelism, FetchToFFT, float>{to_read});
+          Fetch<kLogN, kLogParallelism, FetchToFFT, float>{to_read_0, to_read_1});
 
       auto fft_event = q.single_task<class FFTKernel>(
           FFT<kLogN, kLogParallelism, FetchToFFT, FFTToTranspose, float>{
@@ -342,7 +356,8 @@ void TestFFT(bool inverse) {
     std::cout << "Signal to noise ratio on output sample: " << db << std::endl;
     std::cout << " --> " << (db > 120 ? "PASSED" : "FAILED") << std::endl;
 
-    sycl::free(input_data, q);
+    sycl::free(input_data_0, q);
+    sycl::free(input_data_1, q);
     free(output_data, q);
     free(temp_data, q);
 

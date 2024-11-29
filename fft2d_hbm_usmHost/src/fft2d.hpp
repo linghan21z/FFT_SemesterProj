@@ -392,10 +392,13 @@ int BitReversed(int x) {
  */
 template <int logn, size_t log_points, typename PipeOut, typename T>
 struct Fetch { //reading matrix data from memory and sending the fetched data to FFT engine using a data pipeline
-  ac_complex<T> *src;
+  // ac_complex<T> *src; 
+  ac_complex<T> *src_0; // HBM Channel 0
+  ac_complex<T> *src_1; // HBM Channel 1
   // int mangle; //The mangle flag controls whether to use an optimized memory layout
 
-  Fetch(ac_complex<T> *src_ ) : src(src_) {}
+  // Fetch(ac_complex<T> *src_ ) : src(src_) {}
+  Fetch(ac_complex<T> *src_0_, ac_complex<T> *src_1_) : src_0(src_0_), src_1(src_1_) {}
 
   [[intel::kernel_args_restrict]]  // NO-FORMAT: Attribute, an Intel FPGA-specific attribute to enable more efficient memory access by guaranteeing that kernel function arguments do not alias
   void operator()() const {
@@ -423,16 +426,23 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         int where, where_global;
         where = x;
         where_global = where;
-        
-//Now come to real "read data" operation
+
+        //Now come to real "read data" operation
+        if (i < kIterations / 2) {          
 #pragma unroll //Buffered Data Storage: 
 //The data is then read into a local buffer(buf) using the computed memory index
-        for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
-          buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
-              src[where_global + k];
+          for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
+            buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
+                src_0[where_global + k];
+          }
+        } else {
+          for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
+            buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
+                src_1[where_global + k];
+          }
         }
-      }
-
+      }  
+        
       for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
         int row = work_item >> (logn - log_points);
         int col = work_item & (kN / kPoints - 1);
@@ -447,8 +457,9 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         } //data is bit-reversed before being written to the PipeOut pipe
         PipeOut::write(to_pipe);
       }         //writing data to a pipe in an Intel FPGA kernel, part of the SYCL (DPC++) programming model.
-    }   //PipeOut is likely an output pipe that sends data from the current kernel (the Fetch kernel) to another kernel
-  }     //pipe buffer acts as a FIFO queue that can be consumed by another kernel 
+          //PipeOut is likely an output pipe that sends data from the current kernel (the Fetch kernel) to another kernel
+    }     //pipe buffer acts as a FIFO queue that can be consumed by another kernel 
+  }
 };
 
 /* The FFT engine
