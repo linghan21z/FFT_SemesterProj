@@ -292,11 +292,19 @@ void TestFFT(bool inverse) {
                 FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
                 float>{to_read});
 
-      auto fft_event = q.single_task<class FFTKernel>(
-          FFT<kLogN, kLogParallelism, 
+      auto fft_event0 = q.single_task<class FFTKernel0>(
+          FFT0<kLogN, kLogParallelism, 
               FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
-              FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+              // FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
               FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+              // FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+              float>{inverse});
+
+      auto fft_event1 = q.single_task<class FFTKernel1>(
+          FFT1<kLogN, kLogParallelism, 
+              // FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+              FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+              // FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
               FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
               float>{inverse});
 
@@ -306,7 +314,11 @@ void TestFFT(bool inverse) {
                     FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
                     float>{to_write});
 
-      fft_event.wait();
+      // Synchronize the events 
+      //the results of the two kernels need to be combined, synchronize their completion with wait()
+      fft_event0.wait();
+      fft_event1.wait();
+      // fft_event.wait();
       transpose_event.wait();
 
       //Time
