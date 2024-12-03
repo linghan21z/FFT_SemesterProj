@@ -411,28 +411,34 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
 
     for (int i = 0; i < kIterations; i++) {
       // Local memory for storing 8 rows 
-      ac_complex<T> buf[kPoints * kN]; //matrix data is fetched row by row and stored in the buf array.
-      for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
+      ac_complex<T> buf0[kPoints / 2 * kN]; //matrix data is fetched row by row and stored in the buf array.
+      ac_complex<T> buf1[kPoints / 2 * kN];
+      for (int work_item = 0; work_item < kWorkGroupSize / 2; work_item++) {
 //These are just computing the index or offset need to "read data"
         // Each read fetches 8 matrix points
         int x = (i * kN + work_item) << log_points; //matrix offset for the current work item.
-
-        /* When using the alternative memory layout, each row consists of a set
-         * of segments placed far apart in memory. Instead of reading all
-         * segments from one row in order, read one segment from each row before
-         * switching to the next segment. This requires swapping bits log(N) + 2
-         * ... log(N) with bits log(N) / 2 + 2 ... log(N) / 2 in the offset.
-         */
+        //x1 for buf1[]
+        int x1 = (i * kN + (work_item + kWorkGroupSize / 2)) << log_points;
+        
         int where, where_global;
         where = x;
         where_global = where;
+
+        int where1, where_global1;
+        where1 = x1;
+        where_global1 = where1;
         
 //Now come to real "read data" operation
 #pragma unroll //Buffered Data Storage: 
 //The data is then read into a local buffer(buf) using the computed memory index
         for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
-          buf[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
+          buf0[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
               src[where_global + k];
+
+          // buf1[(where1 & ((1 << (logn + log_points)) - 1)) + k] = 
+          //     src[where_global1 + k];
+          buf1[(where & ((1 << (logn + log_points)) - 1)) + k] = 
+              src[where_global1 + k];
         }
       }
 
@@ -447,19 +453,21 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
                   to_pipe0, to_pipe1, to_pipe2, to_pipe3, to_pipe4, to_pipe5, to_pipe6, to_pipe7; //sent to the FFT engine in chunks
 #pragma unroll
         for (int k = 0; k < kPoints; k++) { //Each chunk contains kPoints data points
-          to_pipe0[k] = buf[row * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe1[k] = buf[(row + 1) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe2[k] = buf[(row + 2) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe3[k] = buf[(row + 3) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe4[k] = buf[(row + 4) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe5[k] = buf[(row + 5) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe6[k] = buf[(row + 6) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
-          to_pipe7[k] = buf[(row + 7) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe0[k] = buf0[row * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe1[k] = buf0[(row + 1) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe2[k] = buf0[(row + 2) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe3[k] = buf0[(row + 3) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+         
+          to_pipe4[k] = buf1[row * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe5[k] = buf1[(row + 1) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe6[k] = buf1[(row + 2) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
+          to_pipe7[k] = buf1[(row + 3) * kN + BitReversed<log_points>(k) * kN / kPoints + col];
         } //data is bit-reversed before being written to the PipeOut pipe
         PipeOut0::write(to_pipe0);
         PipeOut1::write(to_pipe1);
         PipeOut2::write(to_pipe2);
         PipeOut3::write(to_pipe3);
+
         PipeOut4::write(to_pipe4);
         PipeOut5::write(to_pipe5);
         PipeOut6::write(to_pipe6);

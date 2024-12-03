@@ -281,7 +281,7 @@ void TestFFT(bool inverse) {
         sycl::ext::intel::pipe<class FFTToTransposePipe7, 
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
-    for (int i = 0; i < 2; i++) { //0 to read(Fetch->FFT kernel), 1 to write(FFT->Transpo kernel)
+    for (int i = 0; i < 2; i++) { 
       ac_complex<float> *to_read = i == 0 ? input_data : temp_data;
       ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
       //Implement FFT
