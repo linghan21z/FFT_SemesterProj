@@ -395,10 +395,12 @@ template <int logn, size_t log_points,
           typename PipeOut4, typename PipeOut5, typename PipeOut6, typename PipeOut7, 
           typename T>
 struct Fetch { //reading matrix data from memory and sending the fetched data to FFT engine using a data pipeline
-  ac_complex<T> *src;
+  // ac_complex<T> *src;
+  ac_complex<T> *src_0; // src_0 - buf0[]
+  ac_complex<T> *src_1; // src_1 - buf1[]
   // int mangle; //The mangle flag controls whether to use an optimized memory layout
 
-  Fetch(ac_complex<T> *src_ ) : src(src_) {}
+ Fetch(ac_complex<T> *src_0_, ac_complex<T> *src_1_) : src_0(src_0_), src_1(src_1_) {}
 
   [[intel::kernel_args_restrict]]  // NO-FORMAT: Attribute, an Intel FPGA-specific attribute to enable more efficient memory access by guaranteeing that kernel function arguments do not alias
   void operator()() const {
@@ -408,37 +410,35 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
     constexpr int kWorkGroupSize = kN; //size of the work group
     constexpr int kIterations = kN * kN / kPoints / kWorkGroupSize; //num of iterations required to process the entire matrix.
                // 2 iteration = 16x16 / 8       /16
-
+    
+    ac_complex<T> *local_src_0 = src_0; // Local pointer for src_0
+    ac_complex<T> *local_src_1 = src_1; // Local pointer for src_1
+    
     for (int i = 0; i < kIterations; i++) {
       // Local memory for storing 8 rows 
       ac_complex<T> buf0[kPoints / 2 * kN]; //matrix data is fetched row by row and stored in the buf array.
       ac_complex<T> buf1[kPoints / 2 * kN];
+      
       for (int work_item = 0; work_item < kWorkGroupSize / 2; work_item++) {
 //These are just computing the index or offset need to "read data"
         // Each read fetches 8 matrix points
         int x = (i * kN + work_item) << log_points; //matrix offset for the current work item.
-        //x1 for buf1[]
-        int x1 = (i * kN + (work_item + kWorkGroupSize / 2)) << log_points;
-        
+              
         int where, where_global;
         where = x;
         where_global = where;
-
-        int where1, where_global1;
-        where1 = x1;
-        where_global1 = where1;
         
 //Now come to real "read data" operation
 #pragma unroll //Buffered Data Storage: 
 //The data is then read into a local buffer(buf) using the computed memory index
         for (int k = 0; k < kPoints; k++) { //where bitwise 2^7-1(111 1111) +k
           buf0[(where & ((1 << (logn + log_points)) - 1)) + k] = //just fill in every kpoints bits(k control)
-              src[where_global + k];
+              src_0[where_global + k];
 
           // buf1[(where1 & ((1 << (logn + log_points)) - 1)) + k] = 
           //     src[where_global1 + k];
           buf1[(where & ((1 << (logn + log_points)) - 1)) + k] = 
-              src[where_global1 + k];
+              src_1[where_global + k];
         }
       }
 
@@ -473,6 +473,12 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         PipeOut6::write(to_pipe6);
         PipeOut7::write(to_pipe7);
       }         //writing data to a pipe in an Intel FPGA kernel, part of the SYCL (DPC++) programming model.
+    // src_0 = src_0 + 8 * kN;
+    // src_1 = src_1 + 8 * kN;
+    // Increment the local pointers
+    local_src_0 += 8 * kN;
+    local_src_1 += 8 * kN;
+    
     }   //PipeOut is likely an output pipe that sends data from the current kernel (the Fetch kernel) to another kernel
   }     //pipe buffer acts as a FIFO queue that can be consumed by another kernel 
 };

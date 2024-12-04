@@ -282,15 +282,17 @@ void TestFFT(bool inverse) {
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
     for (int i = 0; i < 2; i++) { 
-      ac_complex<float> *to_read = i == 0 ? input_data : temp_data;
-      ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
+        ac_complex<float> *to_read0 = i == 0 ? input_data : temp_data; 
+        ac_complex<float> *to_read1 = i == 0 ? input_data + 4 * kN : temp_data + 4 * kN;
+        ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
+      
       //Implement FFT
       // Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
           Fetch<kLogN, kLogParallelism, 
                 FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
                 FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
-                float>{to_read});
+                float>{to_read0, to_read1});
 
       auto fft_event = q.single_task<class FFTKernel>(
           FFT<kLogN, kLogParallelism, 
