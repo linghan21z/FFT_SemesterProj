@@ -172,7 +172,7 @@ ac_complex<T> Twiddle(int index, int stage, int stream) {
   // Use the precomputed twiddle factors, if available - otherwise, compute them
   int twid_stage = stage >> 1; //shifts the bits of stage one position to right(/2),
     //stages are often halved because the FFT process breaks down the problem into smaller subproblems
-  if constexpr (size <= (1 << (kTwiddleStages * 2 + 2))) { //shift binary 1 to the left by 12 positions=2^12=4096
+  if constexpr (size <= (1 << (kTwiddleStages * 2 + 2))) {//shift binary 1 to the left by 12 positions=2^12=4096
     if constexpr (points == 8) {
       twid.r() =
           twiddles_cos_8_points[twid_stage][stream]
