@@ -93,6 +93,7 @@ void TestFFT(bool inverse) {
     constexpr int kParallelism = 4;
 #else
     constexpr int kLogN = LOGN;
+    // constexpr int kLogN_column = LOGN_column; //need to be indicated in cmake
     constexpr int kParallelism = PARALLELISM;
 #endif
 
@@ -101,17 +102,20 @@ void TestFFT(bool inverse) {
                   "8-parallel FFTs.");
 
     constexpr int kN = 1 << kLogN; //size of fft matrix, eg 16*16
+    //--------------- 
+    constexpr int kLogN_column = kLogN + 1; //column = row * 2, eg. 32*64
+    constexpr int kLogN_max = (kLogN_column > kLogN) ? kLogN_column : kLogN; //
+    constexpr int kN_column = 1 << kLogN_column;
     constexpr int kLogParallelism = kParallelism == 8 ? 3 : 2; //log8=3,log4=2
-
     // Host memory
     ac_complex<float> *host_input_data =
-        (ac_complex<float> *)std::malloc(sizeof(ac_complex<float>) * kN * kN); //kN * kN is num of all elements in a matrix
+        (ac_complex<float> *)std::malloc(sizeof(ac_complex<float>) * kN * kN_column); //kN * kN is num of all elements in a matrix
     ac_complex<float> *host_output_data =
-        (ac_complex<float> *)std::malloc(sizeof(ac_complex<float>) * kN * kN);
+        (ac_complex<float> *)std::malloc(sizeof(ac_complex<float>) * kN * kN_column);
     ac_complex<double> *host_verify =
-        (ac_complex<double> *)std::malloc(sizeof(ac_complex<double>) * kN * kN);
+        (ac_complex<double> *)std::malloc(sizeof(ac_complex<double>) * kN * kN_column);
     ac_complex<double> *host_verify_tmp =
-        (ac_complex<double> *)std::malloc(sizeof(ac_complex<double>) * kN * kN);
+        (ac_complex<double> *)std::malloc(sizeof(ac_complex<double>) * kN * kN_column);
 
     //checks whether the memory allocation for host data is successful
     if ((host_input_data == nullptr) || (host_output_data == nullptr) ||
@@ -122,13 +126,11 @@ void TestFFT(bool inverse) {
 
     // Initialize input and produce verification data
     for (int i = 0; i < kN; i++) {
-      for (int j = 0; j < kN; j++) {
-        // int where = mangle ? MangleBits<kLogN>(Coordinates<kN>(i, j))
-                          //  : Coordinates<kN>(i, j);
-        int where = Coordinates<kN>(i, j);
-        host_verify[Coordinates<kN>(i, j)].r() = host_input_data[where].r() =
+      for (int j = 0; j < kN_column; j++) {
+        int where = Coordinates<kN_column>(i, j);
+        host_verify[Coordinates<kN_column>(i, j)].r() = host_input_data[where].r() =
             (float)((double)rand() / (double)RAND_MAX);
-        host_verify[Coordinates<kN>(i, j)].i() = host_input_data[where].i() =
+        host_verify[Coordinates<kN_column>(i, j)].i() = host_input_data[where].i() =
             (float)((double)rand() / (double)RAND_MAX);
       }
     }
@@ -142,9 +144,9 @@ void TestFFT(bool inverse) {
     if (q.get_device().has(sycl::aspect::usm_device_allocations)) {
       std::cout << "Using USM device allocations" << std::endl;
       // Allocate FPGA DDR memory.
-      input_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
-      output_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
-      temp_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
+      input_data = sycl::malloc_device<ac_complex<float>>(kN * kN_column, q);
+      output_data = sycl::malloc_device<ac_complex<float>>(kN * kN_column, q);
+      temp_data = sycl::malloc_device<ac_complex<float>>(kN * kN_column, q);
     } else if (q.get_device().has(sycl::aspect::usm_host_allocations)) {
       std::cout << "Using USM host allocations" << std::endl;
       // No device allocations means that we are probably in a SYCL HLS flow
@@ -158,9 +160,9 @@ void TestFFT(bool inverse) {
           sycl::ext::intel::experimental::property::usm::buffer_location(1)};
 #endif
 
-      input_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q);
-      output_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
-      temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
+      input_data = sycl::malloc_host<ac_complex<float>>(kN * kN_column, q);
+      output_data = sycl::malloc_host<ac_complex<float>>(kN * kN_column, q, prop_list);
+      temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN_column, q, prop_list);
     } else {
       std::cerr << "USM device allocations or USM host allocations must be "
                    "supported to run this sample."
@@ -175,10 +177,10 @@ void TestFFT(bool inverse) {
     }
 
     // Copy the input data from host DDR to USM memory
-    q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN)
+    q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN_column)
         .wait();
 
-    std::cout << "Launching a " << kN * kN << " points " << kParallelism
+    std::cout << "Launching a " << kN * kN_column << " points " << kParallelism
               << "-parallel " << (inverse ? "inverse " : "")
               // << "FFT transform (" << (mangle ? "alternative" : "ordered")
               << "FFT transform (" << ("ordered")
@@ -229,7 +231,8 @@ void TestFFT(bool inverse) {
     //If less than, there would not be enough data points to keep 
     //all the parallel units busy, leading to underutilization of resources.
     static_assert(kN / kParallelism >= kParallelism); 
-
+    static_assert(kN_column / kParallelism >= kParallelism); 
+                  //32/8=4!>=8, so 32 cannot be 8-parallel
     // Kernel to kernel pipes
     using FetchToFFT =
         sycl::ext::intel::pipe<class FetchToFFTPipe,
@@ -238,24 +241,30 @@ void TestFFT(bool inverse) {
         sycl::ext::intel::pipe<class FFTToTransposePipe,
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
-    for (int i = 0; i < 2; i++) { //0 to read(Fetch->FFT kernel), 1 to write(FFT->Transpo kernel)
+    for (int i = 0; i < 2; i++) { 
       ac_complex<float> *to_read = i == 0 ? input_data : temp_data;
       ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
-      //Implement FFT
+      //Implement FFT  
       // Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
-          Fetch<kLogN, kLogParallelism, FetchToFFT, float>{to_read});
+        Fetch<kLogN_max, kLogN, kLogN_column, kLogParallelism, FetchToFFT, float>{
+            to_read, i});
+      std::cout << "i=0 now come to fft_event" << std::endl;//
 
       auto fft_event = q.single_task<class FFTKernel>(
-          FFT<kLogN, kLogParallelism, FetchToFFT, FFTToTranspose, float>{
-              inverse});
-
+        FFT<kLogN_max, kLogN, kLogN_column, kLogParallelism, FetchToFFT, FFTToTranspose, float>{
+            inverse, i});
+        std::cout << "fft_event finish" << std::endl; //
+            
       auto transpose_event = q.single_task<class TransposeKernel>(
-          Transpose<kLogN, kLogParallelism, FFTToTranspose, float>{to_write});
+        Transpose<kLogN_max, kLogN, kLogN_column, kLogParallelism, FFTToTranspose, float>{
+            to_write, i});
 
       fft_event.wait();
+      std::cout << "now come to transpose_event" << std::endl; //
       transpose_event.wait();
-
+      std::cout << "transpose_event finish" << std::endl; //
+      
       //Time
       if (i == 0) {  //0 to read(Fetch->FFT kernel) 1st fft start
         start_time = fetch_event.template get_profiling_info<
@@ -263,21 +272,22 @@ void TestFFT(bool inverse) {
       } else { //1 to transpose and write back(FFT-> Transpose kernel) 2nd fft end
         end_time = transpose_event.template get_profiling_info<
             sycl::info::event_profiling::command_end>();
-      }
+      }      
     }
+    
     //it's the time for twice fft - 2d fft time
     double kernel_runtime = (end_time - start_time) / 1.0e9; //ns (unit)-> s
 
     // Copy the output data from the USM memory to the host DDR
-    q.memcpy(host_output_data, output_data, sizeof(ac_complex<float>) * kN * kN)
+    q.memcpy(host_output_data, output_data, sizeof(ac_complex<float>) * kN * kN_column)
         .wait();
 
     std::cout << "Processing time = " << kernel_runtime << "s" << std::endl;
     
     //how many data points (or grid points in the 2D FFT matrix) are processed per second
-    double gpoints_per_sec = ((double)kN * kN / kernel_runtime) * 1e-9; //perf. of throughput(Gpoints/sec)
+    double gpoints_per_sec = ((double)kN * kN_column / kernel_runtime) * 1e-9; //perf. of throughput(Gpoints/sec)
     //a single point in an FFT requires roughly 10 flops (so 2×5 factor)
-    double gflops = 2 * 5 * kN * kN * (log((float)kN) / log((float)2)) /
+    double gflops = 2 * 5 * kN * kN *(1 + 2* (log((float)kN) / log((float)2)) )/
                     (kernel_runtime * 1e9); ///perf of floating-point operations per second(Gflops)
     //from results, gpoints*100=gflops, 100 derives from 2*5*log2(KN), in the test KN=1024=2^10
 
@@ -288,25 +298,25 @@ void TestFFT(bool inverse) {
 
     // Run reference code on the host,to verify the accuracy of the kernel's results
     //fft-transpose-fft-transpose
-    for (int i = 0; i < kN; i++) {
-      FourierTransformGold<kLogN>(host_verify + Coordinates<kN>(i, 0), inverse);
+    for (int i = 0; i < kN; i++) { //every row, do fft respectively
+      FourierTransformGold<kLogN_column>(host_verify + Coordinates<kN_column>(i, 0), inverse);
     }
     //transpose and tmp-store-intermidiate-result
     for (int i = 0; i < kN; i++) {
-      for (int j = 0; j < kN; j++) {
+      for (int j = 0; j < kN_column; j++) {
         host_verify_tmp[Coordinates<kN>(j, i)] =
-            host_verify[Coordinates<kN>(i, j)];
+            host_verify[Coordinates<kN_column>(i, j)];
       }
     }
 
-    for (int i = 0; i < kN; i++) {         //addr + linear offset
+    for (int i = 0; i < kN_column; i++) { //every column, do fft respectively
       FourierTransformGold<kLogN>(host_verify_tmp + Coordinates<kN>(i, 0),
                                   inverse);
     }
 
-    for (int i = 0; i < kN; i++) {
+    for (int i = 0; i < kN_column; i++) {
       for (int j = 0; j < kN; j++) {
-        host_verify[Coordinates<kN>(j, i)] =
+        host_verify[Coordinates<kN_column>(j, i)] =
             host_verify_tmp[Coordinates<kN>(i, j)];
       }
     }
@@ -314,21 +324,21 @@ void TestFFT(bool inverse) {
     double magnitude_sum = 0;
     double noise_sum = 0;
     for (int i = 0; i < kN; i++) {
-      for (int j = 0; j < kN; j++) {
-        int where = Coordinates<kN>(i, j);
+      for (int j = 0; j < kN_column; j++) {
+        int where = Coordinates<kN_column>(i, j);
         //real^2+imaginary^2
-        double magnitude = (double)host_verify[Coordinates<kN>(i, j)].r() *
-                               (double)host_verify[Coordinates<kN>(i, j)].r() +
-                           (double)host_verify[Coordinates<kN>(i, j)].i() *
-                               (double)host_verify[Coordinates<kN>(i, j)].i();
+        double magnitude = (double)host_verify[Coordinates<kN_column>(i, j)].r() *
+                               (double)host_verify[Coordinates<kN_column>(i, j)].r() +
+                           (double)host_verify[Coordinates<kN_column>(i, j)].i() *
+                               (double)host_verify[Coordinates<kN_column>(i, j)].i();
         //diff-real^2 + diff-imaginary^2
-        double noise = (host_verify[Coordinates<kN>(i, j)].r() -
+        double noise = (host_verify[Coordinates<kN_column>(i, j)].r() -
                         (double)host_output_data[where].r()) *
-                           (host_verify[Coordinates<kN>(i, j)].r() -
+                           (host_verify[Coordinates<kN_column>(i, j)].r() -
                             (double)host_output_data[where].r()) +
-                       (host_verify[Coordinates<kN>(i, j)].i() -
+                       (host_verify[Coordinates<kN_column>(i, j)].i() -
                         (double)host_output_data[where].i()) *
-                           (host_verify[Coordinates<kN>(i, j)].i() -
+                           (host_verify[Coordinates<kN_column>(i, j)].i() -
                             (double)host_output_data[where].i());
         //Traverse all points(rows and columns) and accumulate
         magnitude_sum += magnitude;
@@ -340,6 +350,19 @@ void TestFFT(bool inverse) {
     //test is marked as PASSED if the SNR > a certain threshold (120 dB)
     std::cout << "Signal to noise ratio on output sample: " << db << std::endl;
     std::cout << " --> " << (db > 120 ? "PASSED" : "FAILED") << std::endl;
+
+   /*
+    //check reference and computed fft result
+    for (int i = 0; i < 10; i++) { // Print first 10 elements for inspection
+    std::cout << "Expected Output [" << i << "] = (" 
+              << host_verify[Coordinates<kN_column>(0, i)].r() << ", " 
+              << host_verify[Coordinates<kN_column>(0, i)].i() << ")" << std::endl;
+    std::cout << "FFT Output [" << i << "] = (" 
+              << host_output_data[Coordinates<kN_column>(0, i)].r() << ", " 
+              << host_output_data[Coordinates<kN_column>(0, i)].i() << ")" << std::endl;
+    }
+    */
+
 
     sycl::free(input_data, q);
     free(output_data, q);
