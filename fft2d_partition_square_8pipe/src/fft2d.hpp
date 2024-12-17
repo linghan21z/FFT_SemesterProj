@@ -390,6 +390,7 @@ int BitReversed(int x) {
 /* This kernel reads the matrix data and provides "1<<log_points" data to the
  * FFT engine. （fetches multiple rows of matrix data in parallel）
  */
+/*
 template <int logn, size_t log_points, 
           typename PipeOut0, typename PipeOut1, typename PipeOut2, typename PipeOut3, 
           typename PipeOut4, typename PipeOut5, typename PipeOut6, typename PipeOut7, 
@@ -411,8 +412,8 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
     constexpr int kIterations = kN * kN / kPoints / kWorkGroupSize; //num of iterations required to process the entire matrix.
                // 2 iteration = 16x16 / 8       /16
     
-    ac_complex<T> *local_src_0 = src_0; // Local pointer for src_0
-    ac_complex<T> *local_src_1 = src_1; // Local pointer for src_1
+    // ac_complex<T> *local_src_0 = src_0; // Local pointer for src_0
+    // ac_complex<T> *local_src_1 = src_1; // Local pointer for src_1
     
     for (int i = 0; i < kIterations; i++) {
       // Local memory for storing 8 rows 
@@ -473,19 +474,21 @@ struct Fetch { //reading matrix data from memory and sending the fetched data to
         PipeOut6::write(to_pipe6);
         PipeOut7::write(to_pipe7);
       }         //writing data to a pipe in an Intel FPGA kernel, part of the SYCL (DPC++) programming model.
-    // src_0 = src_0 + 8 * kN;
-    // src_1 = src_1 + 8 * kN;
-    // Increment the local pointers
-    local_src_0 += 8 * kN;
-    local_src_1 += 8 * kN;
     
+    // Increment the local pointers
+    // local_src_0 += 8 * kN;
+    // local_src_1 += 8 * kN;
+
     }   //PipeOut is likely an output pipe that sends data from the current kernel (the Fetch kernel) to another kernel
   }     //pipe buffer acts as a FIFO queue that can be consumed by another kernel 
 };
 
-/* The FFT engine
- * 'inverse' toggles between the direct and the inverse transform
- */ //Compute FFT in a streaming fashion using pipes for data input and output
+*/
+
+/*
+// The FFT engine
+// 'inverse' toggles between the direct and the inverse transform
+// //Compute FFT in a streaming fashion using pipes for data input and output
 template <int logn, size_t log_points, 
           typename PipeIn0, typename PipeIn1, typename PipeIn2, typename PipeIn3,
           typename PipeIn4, typename PipeIn5, typename PipeIn6, typename PipeIn7,
@@ -501,11 +504,11 @@ struct FFT {
     constexpr int kN = (1 << logn);
     constexpr int kPoints = (1 << log_points);
 
-    /* The FFT engine requires a sliding window for data reordering; data stored
-     * in this array is carried across loop iterations and shifted by 1 element
-     * every iteration; all loop dependencies(derived from the uses of this
-     * array)are simple transfers between adjacent array elements
-     */
+    // The FFT engine requires a sliding window for data reordering; data stored
+    //   in this array is carried across loop iterations and shifted by 1 element
+    //   every iteration; all loop dependencies(derived from the uses of this
+    //   array)are simple transfers between adjacent array elements
+     
 
     ac_complex<T> fft_delay_elements0[kN + kPoints * (logn - 2)]; //sliding window for data reordering
                                             //The logn - 2 portion relates to the stages of FFT pipeline that require reordering.
@@ -573,6 +576,8 @@ struct FFT {
   }
 };
 
+*/
+
 /* This kernel receives the FFT results, buffers "1<<log_points" rows and then
  * writes the results transposed in memory. Because "1<<log_points" rows are
  * buffered, "1<<log_points" consecutive columns can be written at a time on
@@ -580,6 +585,7 @@ struct FFT {
  * using the alternative matrix format, consecutive rows are closer in memory,
  * and this is also beneficial for higher memory access efficiency
  */
+/*
 template <int logn, size_t log_points, 
           typename PipeIn0, typename PipeIn1, typename PipeIn2, typename PipeIn3,
           typename PipeIn4, typename PipeIn5, typename PipeIn6, typename PipeIn7, 
@@ -599,12 +605,13 @@ struct Transpose {
                            sycl::ext::intel::experimental::dwidth<
                                sizeof(ac_complex<T>) * 8 * (1 << log_points)>,
                            sycl::ext::intel::experimental::latency<0>})>
-      dest;  //The output memory buffer that stores the transposed results.
+      // dest;  //The output memory buffer that stores the transposed results.
+      dest0, dest1;
 #endif
 
   // int mangle; //flag controls whether the alternative memory layout is used.
 
-  Transpose(ac_complex<T> *dest_) : dest(dest_) {}
+  Transpose(ac_complex<T> *dest_0, ac_complex<T> *dest_1) : dest0(dest_0), dest1(dest_1) {}
 
   [[intel::kernel_args_restrict]]  // NO-FORMAT: Attribute
   void operator()() const {
@@ -615,13 +622,17 @@ struct Transpose {
 
     for (int t = 0; t < kIterations; t++) {
       //Data Buffering
-      ac_complex<T> buf[kPoints * kN]; //The kernel buffers(local array) kPoints rows of FFT results at a time,before being written to the output.
+      // ac_complex<T> buf[kPoints * kN];
+      ac_complex<T> buf0[kPoints / 2 * kN]; //The kernel buffers(local array) kPoints rows of FFT results at a time,before being written to the output.
+      ac_complex<T> buf1[kPoints / 2 * kN]; 
+      
       for (int work_item = 0; work_item < (kWorkGroupSize >> 3); work_item++) {
         //Reading Data from Pipe
         std::array<ac_complex<T>, kPoints> from_pipe0 = PipeIn0::read(); //reads kPoints complex numbers from the input pipe,correspond to one row of FFT output data.
         std::array<ac_complex<T>, kPoints> from_pipe1 = PipeIn1::read();
         std::array<ac_complex<T>, kPoints> from_pipe2 = PipeIn2::read();
         std::array<ac_complex<T>, kPoints> from_pipe3 = PipeIn3::read(); 
+        
         std::array<ac_complex<T>, kPoints> from_pipe4 = PipeIn4::read(); 
         std::array<ac_complex<T>, kPoints> from_pipe5 = PipeIn5::read();
         std::array<ac_complex<T>, kPoints> from_pipe6 = PipeIn6::read();
@@ -630,21 +641,22 @@ struct Transpose {
 #pragma unroll
         for (int k = 0; k < kPoints; k++) {
           //Buffering the Read Data
-          buf[kPoints * work_item + k] = from_pipe0[k]; 
-          buf[kPoints * work_item + kN + k] = from_pipe1[k];
-          buf[kPoints * work_item + 2 * kN + k] = from_pipe2[k]; 
-          buf[kPoints * work_item + 3 * kN + k] = from_pipe3[k]; 
-          buf[kPoints * work_item + 4 * kN + k] = from_pipe4[k]; 
-          buf[kPoints * work_item + 5 * kN + k] = from_pipe5[k]; 
-          buf[kPoints * work_item + 6 * kN + k] = from_pipe6[k]; 
-          buf[kPoints * work_item + 7 * kN + k] = from_pipe7[k];
+          buf0[kPoints * work_item + k] = from_pipe0[k]; 
+          buf0[kPoints * work_item + kN + k] = from_pipe1[k];
+          buf0[kPoints * work_item + 2 * kN + k] = from_pipe2[k]; 
+          buf0[kPoints * work_item + 3 * kN + k] = from_pipe3[k]; 
+
+          buf1[kPoints * work_item + 0 * kN + k] = from_pipe4[k]; 
+          buf1[kPoints * work_item + 1 * kN + k] = from_pipe5[k]; 
+          buf1[kPoints * work_item + 2 * kN + k] = from_pipe6[k]; 
+          buf1[kPoints * work_item + 3 * kN + k] = from_pipe7[k];
         
         }//Each row stored in local buf, with consecutive rows stacked vertically in memory.
       }
 
       //This part does not need any change, just store dest[]=buf[kPoints*kN] same as before
       //similar to "Fetch", buf[]=src[], no change
-      for (int work_item = 0; work_item < kWorkGroupSize; work_item++) {
+      for (int work_item = 0; work_item < kWorkGroupSize / 2; work_item++) {
         //Transpose Logic
         int colt = work_item; //colt (column index)
         int revcolt = BitReversed<logn>(colt); //bit-reversed column index, transpose write operation to ensure the FFT results are placed correctly
@@ -656,11 +668,12 @@ struct Transpose {
 #pragma unroll
         for (int k = 0; k < kPoints; k++) {
           //Writing the Transposed Data
-          dest[where + k] = buf[k * kN + revcolt];
+          dest0[where + k] = buf0[k * kN + revcolt];
+          dest1[where + k] = buf1[k * kN + revcolt];
         }
       }
     }
   }
 };
-
+*/
 #endif /* __FFT2D_HPP__ */

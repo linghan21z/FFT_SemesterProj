@@ -38,9 +38,39 @@ if(NOT DEFINED FPGA_DEVICE)
     set(FPGA_DEVICE "Agilex7")
 endif()
 
+
+# ----------------
+if (NOT DEFINED PART)
+    # set (PART " ")
+    set (PART "INTERLEAVING")  
+endif()
+
+set(EXTRA_COMPILE_FLAGS )
+set(EXTRA_LINK_FLAGS )
+if(${PART} STREQUAL INTERLEAVING)
+    # Nothing to do, regular compile
+elseif(${PART} STREQUAL NO_INTERLEAVING)
+    # Disable interleaving features
+    set(EXTRA_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS};-DNO_INTERLEAVING)
+    # if (DEVICE_FLAG STREQUAL "A10")
+    #     set(EXTRA_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS};-DTWO_CHANNELS)    
+    # else ()
+    #     set(EXTRA_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS};-DFOUR_CHANNELS)    
+    # endif()
+
+    set(EXTRA_LINK_FLAGS ${EXTRA_LINK_FLAGS};-Xsno-interleaving=default)
+else()
+    message(FATAL_ERROR "No matching compile parts found for part ${PART}\n
+Valid parts -DPART=[ INTERLEAVING - NO_INTERLEAVING ]")
+endif()
+# ----------------------
+
+
 # Use cmake -DUSER_FPGA_FLAGS=<flags> to set extra flags for FPGA backend
 # compilation. 
-set(USER_FPGA_FLAGS ${USER_FPGA_FLAGS})
+# set(USER_FPGA_FLAGS ${USER_FPGA_FLAGS})
+set(USER_FPGA_FLAGS ${USER_FPGA_FLAGS};${EXTRA_LINK_FLAGS})
+# ----------------11
 
 set(LOGN "10")
 
@@ -59,7 +89,9 @@ endif()
 message(STATUS "PARALLELISM=${PARALLELISM}")
 
 # Use cmake -DUSER_FLAGS=<flags> to set extra flags for general compilation.
-set(USER_FLAGS ${USER_FLAGS};-DLOGN=${LOGN};-DPARALLELISM=${PARALLELISM})
+# set(USER_FLAGS ${USER_FLAGS};-DLOGN=${LOGN};-DPARALLELISM=${PARALLELISM})
+set(USER_FLAGS ${USER_FLAGS};-DLOGN=${LOGN};-DPARALLELISM=${PARALLELISM};${EXTRA_COMPILE_FLAGS})
+# ----
 
 # Use cmake -DUSER_INCLUDE_PATHS=<paths> to set extra paths for general
 # compilation.

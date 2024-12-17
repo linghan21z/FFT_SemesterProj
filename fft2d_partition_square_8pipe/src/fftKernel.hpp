@@ -31,9 +31,9 @@ sycl::event runFetchKernel(sycl::queue &q, int fftIteration,
             // sycl::buffer<ac_complex<float>, 1> &buf_in1,
             // sycl::buffer<ac_complex<float>, 1> &buf_inout0,
             // sycl::buffer<ac_complex<float>, 1> &buf_inout1
-            ac_complex<T>* input_data_0, ac_complex<T>* input_data_1,
-            ac_complex<T>* temp_data_0, ac_complex<T>* temp_data_1,
-            ac_complex<T>* output_data_0, ac_complex<T>* output_data_1) {
+            ac_complex<T> &input_data_0, ac_complex<T> &input_data_1,
+            ac_complex<T> &temp_data_0, ac_complex<T> &temp_data_1,
+            ac_complex<T> &output_data_0, ac_complex<T> &output_data_1) {
 
 #define MEM_CHANNELS
  //using mem_channel 

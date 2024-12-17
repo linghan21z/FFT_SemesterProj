@@ -9,6 +9,8 @@
 
 #include "exception_handler.hpp"
 #include "fft2d.hpp"
+#include "fftKernel.hpp"
+// using namespace sycl;
 
 // Forward declarations
 void TestFFT(bool inverse); //reordering of bits, fft/ifft
@@ -86,6 +88,9 @@ void TestFFT(bool inverse) {
     std::cout << "Running on device: "
               << device.get_info<sycl::info::device::name>() << std::endl;
 
+////////////////////////////////
+
+
     // Define the log of the FFT size on each dimension and the level of parallelism to implement
 #if FPGA_SIMULATOR
     // Force small sizes in simulation mode to reduce simulation time
@@ -133,18 +138,42 @@ void TestFFT(bool inverse) {
       }
     }
 
-    // Device memory
-    ac_complex<float> *input_data;
-    ac_complex<float> *output_data;
-    ac_complex<float> *temp_data;
+
+// Device memory
+    ac_complex<float> *input_data_0;
+    ac_complex<float> *input_data_1;
+    ac_complex<float> *output_data_0;
+    ac_complex<float> *output_data_1;
+    ac_complex<float> *temp_data_0;
+    ac_complex<float> *temp_data_1;
 
     //Device memory is allocated depending on the device's support for Unified Shared Memory (USM).
     if (q.get_device().has(sycl::aspect::usm_device_allocations)) {
       std::cout << "Using USM device allocations" << std::endl;
-      // Allocate FPGA DDR memory.
-      input_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
-      output_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
-      temp_data = sycl::malloc_device<ac_complex<float>>(kN * kN, q);
+      // Allocate FPGA DDR memory. - BURST-NON-ALIGNED
+      // input_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      // input_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      // output_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      // output_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      // temp_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      // temp_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+
+    //Ensure properly aligned for the hardware. Misaligned memory can cause segmentation faults, especially on FPGA hardware
+      // size_t base_addr_align = device.get_info<sycl::info::device::mem_base_addr_align>();
+      // size_t max_alloc_size = device.get_info<sycl::info::device::max_mem_alloc_size>();
+      // //Memory base address alignment (in bytes): 128 // Maximum memory allocation size: 66999881728 bytes
+      // std::cout << "Memory base address alignment (in bytes): " << base_addr_align / 8 << std::endl;
+      // std::cout << "Maximum memory allocation size: " << max_alloc_size << " bytes" << std::endl;
+      
+      //aligned_malloc_shared - BURST-NON-ALIGNED // aligned_alloc_device - BURST-NON-ALIGNED //aligned_alloc
+      input_data_0 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+      input_data_1 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+      temp_data_0 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+      temp_data_1 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+      output_data_0 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+      output_data_1 = sycl::aligned_alloc_shared<ac_complex<float>>(128, kN * kN / 2, q);
+
+
     } else if (q.get_device().has(sycl::aspect::usm_host_allocations)) {
       std::cout << "Using USM host allocations" << std::endl;
       // No device allocations means that we are probably in a SYCL HLS flow
@@ -157,10 +186,16 @@ void TestFFT(bool inverse) {
       auto prop_list = sycl::property_list{
           sycl::ext::intel::experimental::property::usm::buffer_location(1)};
 #endif
-
-      input_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q);
-      output_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
-      temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
+      // input_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q);
+      // output_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
+      // temp_data = sycl::malloc_host<ac_complex<float>>(kN * kN, q, prop_list);
+      input_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      input_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q);
+      output_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q, prop_list);
+      output_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q, prop_list);
+      temp_data_0 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q, prop_list);
+      temp_data_1 = sycl::malloc_device<ac_complex<float>>(kN * kN / 2, q, prop_list);
+      
     } else {
       std::cerr << "USM device allocations or USM host allocations must be "
                    "supported to run this sample."
@@ -168,15 +203,61 @@ void TestFFT(bool inverse) {
       std::terminate();
     }
 
-    if (input_data == nullptr || output_data == nullptr ||
-        temp_data == nullptr) {
+    if (input_data_0 == nullptr || input_data_1 == nullptr || 
+        output_data_0 == nullptr || output_data_1 == nullptr ||
+        temp_data_0 == nullptr || temp_data_1 == nullptr) {
       std::cerr << "Failed to allocate USM memory." << std::endl;
       std::terminate();
     }
-
     // Copy the input data from host DDR to USM memory
-    q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN)
-        .wait();
+    // q.memcpy(input_data, host_input_data, sizeof(ac_complex<float>) * kN * kN).wait();
+
+
+// Assuming input_data_0 and input_data_1 are allocated with enough memory
+    int chunk_size = 4 * kN; // Size of each chunk in the range
+    int num_chunks = kN / 8; // Total number of chunks to process
+
+    int offset_in = 0;  // Offset in host_input_data
+    int offset_out_0 = 0; // Offset in input_data_0
+    int offset_out_1 = 0; // Offset in input_data_1
+
+    // //Validate memory boundaries
+    // if (offset_out_0 + chunk_size > kN * kN / 2 || offset_out_1 + chunk_size > kN * kN / 2) {
+    //   std::cerr << "Memory copy exceeds buffer size!" << std::endl;
+    //   std::terminate();
+    // }
+        //if do not use memcpy---
+    // for (int i = 0; i < num_chunks; i++) {
+    //   // Copy the current chunk to input_data_0
+    //   offset_in = i * 2 * chunk_size;
+    //   q.memcpy(input_data_0 + offset_out_0, host_input_data + offset_in, 
+    //           sizeof(ac_complex<float>) * chunk_size).wait();
+    //   offset_out_0 += chunk_size;
+
+    //   // Copy the next chunk to input_data_1
+    //   offset_in = (i * 2 + 1) * chunk_size;
+    //   q.memcpy(input_data_1 + offset_out_1, host_input_data + offset_in, 
+    //           sizeof(ac_complex<float>) * chunk_size).wait();
+    //   offset_out_1 += chunk_size;
+    // }
+
+    for (int i = 0; i < num_chunks; i++) {
+    offset_in = i * 2 * chunk_size;
+
+    // Copy the current chunk to input_data_0
+    for (int j = 0; j < chunk_size; ++j) {
+        input_data_0[offset_out_0 + j] = host_input_data[offset_in + j];
+    }
+    offset_out_0 += chunk_size;
+
+    // Copy the next chunk to input_data_1
+    offset_in = (i * 2 + 1) * chunk_size;
+    for (int j = 0; j < chunk_size; ++j) {
+        input_data_1[offset_out_1 + j] = host_input_data[offset_in + j];
+    }
+    offset_out_1 += chunk_size;
+  }
+
 
     std::cout << "Launching a " << kN * kN << " points " << kParallelism
               << "-parallel " << (inverse ? "inverse " : "")
@@ -281,13 +362,87 @@ void TestFFT(bool inverse) {
         sycl::ext::intel::pipe<class FFTToTransposePipe7, 
                                std::array<ac_complex<float>, kParallelism>, 0>;
 
+
+// #define NO_INTERLEAVING //using cmake to get it 
+/*
+#define MEM_CHANNELS
+
+ //using mem_channel 
+#if defined(NO_INTERLEAVING) && defined(MEM_CHANNELS)
+    sycl::range<1> num_items(kN * kN / 2);
+
+    sycl::buffer buf_in0(input_data_0, num_items, {sycl::property::buffer::mem_channel{1}});
+    sycl::buffer buf_in1(input_data_1, num_items, {sycl::property::buffer::mem_channel{2}});
+    sycl::buffer buf_inout0(temp_data_0, num_items, {sycl::property::buffer::mem_channel{3}});
+    sycl::buffer buf_inout1(temp_data_1, num_items, {sycl::property::buffer::mem_channel{4}});
+    sycl::buffer buf_out0(output_data_0, num_items, {sycl::property::buffer::mem_channel{5}});
+    sycl::buffer buf_out1(output_data_1, num_items, {sycl::property::buffer::mem_channel{6}});
+#else
+    sycl::buffer buf_in0(input_data_0);
+    sycl::buffer buf_in1(input_data_1);
+    sycl::buffer buf_inout0(temp_data_0);
+    sycl::buffer buf_inout1(temp_data_1);
+    sycl::buffer buf_out0(output_data_0);
+    sycl::buffer buf_out1(output_data_1);
+#endif
+
+    // Validate Accessor Creation
+    std::cout << "Buffer buf_in0 size: " << buf_in0.get_range().size() << std::endl;
+*/
+
+      // Debug Accessor-to-Pointer Conversion
+      // if (input_data_mem0.size() == 0) {
+      //   std::cerr << "input_data_mem0 accessor size is zero!" << std::endl;
+      //   std::terminate();
+      // }
+      // if (temp_data_mem0.size() == 0) {
+      //   std::cerr << "temp_data_mem0 accessor size is zero!" << std::endl;
+      //   std::terminate();
+      // }
+      // std::cout << "input_data_mem0 range: " << input_data_mem0.get_range().size() << std::endl;
+      // std::cout << "temp_data_mem0 range: " << temp_data_mem0.get_range().size() << std::endl;
+   
     for (int i = 0; i < 2; i++) { 
-        ac_complex<float> *to_read0 = i == 0 ? input_data : temp_data; 
-        ac_complex<float> *to_read1 = i == 0 ? input_data + 4 * kN : temp_data + 4 * kN;
-        ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
+        // ac_complex<float> *to_read0 = i == 0 ? input_data : temp_data; 
+        // ac_complex<float> *to_read1 = i == 0 ? input_data + 4 * kN : temp_data + 4 * kN;
+        // ac_complex<float> *to_write = i == 0 ? temp_data : output_data;
+    
+    /* q.submit([&](sycl::handler &h) {
+        sycl::accessor input_data_mem0(buf_in0, h, sycl::read_write);
+        sycl::accessor input_data_mem1(buf_in1, h, sycl::read_write);
+        sycl::accessor temp_data_mem0(buf_inout0, h, sycl::read_write);
+        sycl::accessor temp_data_mem1(buf_inout1, h, sycl::read_write);
+        sycl::accessor output_data_mem0(buf_out0, h, sycl::read_write);
+        sycl::accessor output_data_mem1(buf_out1, h, sycl::read_write);
+
+      h.single_task< >([=]() [[intel::kernel_args_restrict]] {
       
-      //Implement FFT
-      // Start a 1D FFT on the matrix rows/columns
+        // try to Access data directly
+        // ac_complex<float> *to_read0 = i == 0 ? &input_data_mem0[0] : &temp_data_mem0[0]; 
+        // ac_complex<float> *to_read1 = i == 0 ? &input_data_mem1[0] : &temp_data_mem1[0];
+        // ac_complex<float> *to_write0 = i == 0 ? &temp_data_mem0[0] : &output_data_mem0[0];
+        // ac_complex<float> *to_write1 = i == 0 ? &temp_data_mem1[0] : &output_data_mem1[0];
+      });
+      }); //q.submit([&](handler &h) {
+    */ 
+      //----------------------------------
+
+      /*  //  Check Conditional Logic
+        std::cout << "i=" << i << ", selecting: "
+          << ((i == 0) ? "input_data_mem0" : "temp_data_mem0") << std::endl;
+        //   // Print Pointer Status
+        // auto ptr = input_data_mem0.get_multi_ptr<sycl::access::decorated::no>().get();
+        // if (!ptr) {
+        //     printf("Pointer from input_data_mem0 is null!\n");
+        // } //This method seems cannot get pointer.
+        if (!to_read0 || !to_read1 || !to_write0 || !to_write1) {
+          std::cerr << "Error: One or more pointers are null!" << std::endl;
+          std::terminate();
+        }
+      */
+      
+      /* // Implement FFT
+      Start a 1D FFT on the matrix rows/columns
       auto fetch_event = q.single_task<class FetchKernel>(
           Fetch<kLogN, kLogParallelism, 
                 FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
@@ -306,10 +461,106 @@ void TestFFT(bool inverse) {
           Transpose<kLogN, kLogParallelism, 
                     FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
                     FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
-                    float>{to_write});
+                    float>{to_write0, to_write1});
+      */
+      // ac_complex<float> *to_read0;
+      // ac_complex<float> *to_read1;
+      // ac_complex<float> *to_write0;
+      // ac_complex<float> *to_write1;
+/*
+      auto fetch_event = q.submit([&](sycl::handler &h) {
+        sycl::accessor input_data_mem0(buf_in0, h, sycl::read_write);
+        sycl::accessor input_data_mem1(buf_in1, h, sycl::read_write);
+        sycl::accessor temp_data_mem0(buf_inout0, h, sycl::read_write);
+        sycl::accessor temp_data_mem1(buf_inout1, h, sycl::read_write);
+        h.single_task<class FetchKernel>([=]() {          
+          if (i == 0) {
+            Fetch<kLogN, kLogParallelism, 
+                FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+                FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+                float>{&input_data_mem0[0], &input_data_mem1[0]};
+          } else {
+            Fetch<kLogN, kLogParallelism, 
+                FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+                FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+                float>{&temp_data_mem0[0], &temp_data_mem1[0]};
+          }                   
+        });
+      });
+      
+      auto fft_event = q.submit([&](sycl::handler &h) {
+        h.single_task<class FFTKernel>([=]() {
+          FFT<kLogN, kLogParallelism, 
+              FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+              FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+              FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+              FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+              float>{inverse};
+        });
+      });      
+
+      auto transpose_event = q.submit([&](sycl::handler &h) {
+        sycl::accessor temp_data_mem0(buf_inout0, h, sycl::read_write);
+        sycl::accessor temp_data_mem1(buf_inout1, h, sycl::read_write);
+        sycl::accessor output_data_mem0(buf_out0, h, sycl::read_write);
+        sycl::accessor output_data_mem1(buf_out1, h, sycl::read_write);
+        // to_write0 = i == 0 ? &temp_data_mem0[0] : &output_data_mem0[0];
+        // to_write1 = i == 0 ? &temp_data_mem1[0] : &output_data_mem1[0];
+        h.single_task<class TransposeKernel>([=]() {          
+          if (i == 0) {
+            Transpose<kLogN, kLogParallelism, 
+                FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+                FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+                float>{&temp_data_mem0[0], &temp_data_mem1[0]};
+          } else {
+            Transpose<kLogN, kLogParallelism, 
+                FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+                FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+                float>{&output_data_mem0[0], &output_data_mem1[0]};
+          }          
+        });
+      });
 
       fft_event.wait();
       transpose_event.wait();
+*/
+      sycl::event fetch_event;
+      sycl::event fft_event;
+      sycl::event transpose_event;
+
+      std::cout << "fetch_event come here" << std::endl;
+      fetch_event = runFetchKernel<kLogN, kLogParallelism, 
+                    FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+                    FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+                    // float>(q, i, buf_in0, buf_in1, buf_inout0, buf_inout1);
+                    float>(q, i, 
+                    input_data_0, input_data_1, 
+                    temp_data_0, temp_data_1,
+                    output_data_0, output_data_1);
+                    
+      std::cout << "fft_event come here" << std::endl;
+      fft_event = runFFTKernel<kLogN, kLogParallelism, 
+                  FetchToFFT0, FetchToFFT1, FetchToFFT2, FetchToFFT3, 
+                  FetchToFFT4, FetchToFFT5, FetchToFFT6, FetchToFFT7, 
+                  FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+                  FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+                  float>(q, inverse);
+      
+      std::cout << "transpose_event come here" << std::endl;
+      transpose_event = runTransposeKernel<kLogN, kLogParallelism, 
+                FFTToTranspose0, FFTToTranspose1, FFTToTranspose2, FFTToTranspose3,
+                FFTToTranspose4, FFTToTranspose5, FFTToTranspose6, FFTToTranspose7, 
+                // float>(q, i, buf_inout0, buf_inout1, buf_out0, buf_out1);
+                float>(q, i, 
+                    input_data_0, input_data_1, 
+                    temp_data_0, temp_data_1,
+                    output_data_0, output_data_1);
+      
+      std::cout << "wait fft_event" << std::endl;
+      fft_event.wait();
+      std::cout << "wait transpose_event" << std::endl;
+      transpose_event.wait();
+
 
       //Time
       if (i == 0) {  //0 to read(Fetch->FFT kernel) 1st fft start
@@ -320,12 +571,35 @@ void TestFFT(bool inverse) {
             sycl::info::event_profiling::command_end>();
       }
     }
+
     //it's the time for twice fft - 2d fft time
     double kernel_runtime = (end_time - start_time) / 1.0e9; //ns (unit)-> s
 
-    // Copy the output data from the USM memory to the host DDR
-    q.memcpy(host_output_data, output_data, sizeof(ac_complex<float>) * kN * kN)
-        .wait();
+    // // Copy the output data from the USM memory to the host DDR
+    // q.memcpy(host_output_data, output_data, sizeof(ac_complex<float>) * kN * kN)
+    //     .wait();
+
+    int chunk_size_out = 4 * kN; // Size of each chunk
+    int num_chunks_out = kN / 8; // Total number of chunks
+
+    int offset_host_out = 0;   // Offset in host_input_data
+    int offset_out_0_ = 0;   // Offset in input_data_0
+    int offset_out_1_ = 0;   // Offset in input_data_1
+
+    for (int i = 0; i < num_chunks_out; i++) {
+        // Copy from input_data_0 back to host_input_data
+        offset_host_out = i * 2 * chunk_size_out;
+        q.memcpy(host_output_data + offset_host_out, output_data_0 + offset_out_0_,
+                sizeof(ac_complex<float>) * chunk_size_out).wait();
+        offset_out_0_ += chunk_size_out;
+
+        // Copy from input_data_1 back to host_input_data
+        offset_host_out = (i * 2 + 1) * chunk_size_out;
+        q.memcpy(host_output_data + offset_host_out, output_data_1 + offset_out_1_,
+                sizeof(ac_complex<float>) * chunk_size_out).wait();
+        offset_out_1_ += chunk_size_out;
+    }
+
 
     std::cout << "Processing time = " << kernel_runtime << "s" << std::endl;
     
@@ -396,9 +670,18 @@ void TestFFT(bool inverse) {
     std::cout << "Signal to noise ratio on output sample: " << db << std::endl;
     std::cout << " --> " << (db > 120 ? "PASSED" : "FAILED") << std::endl;
 
-    sycl::free(input_data, q);
-    free(output_data, q);
-    free(temp_data, q);
+    // sycl::free(input_data, q);
+    // free(output_data, q);
+    // free(temp_data, q);
+
+    sycl::free(input_data_0, q);
+    free(input_data_1, q);
+    free(output_data_0, q);
+    free(output_data_1, q);
+    free(temp_data_0, q);
+    free(temp_data_1, q);
+
+
 
   } catch (sycl::exception const &e) {
     std::cerr << "Caught a synchronous SYCL exception: " << e.what()
