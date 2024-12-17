@@ -50,6 +50,14 @@ endif()
 
 message(STATUS "LOGN=${LOGN}")
 
+set(LOGNCOL "10")
+
+if(DEFINED SET_LOGNCOL)
+    set(LOGNCOL ${SET_LOGNCOL})
+endif()
+
+message(STATUS "LOGNCOL=${LOGNCOL}")
+
 set(PARALLELISM "8")
 
 if(DEFINED SET_PARALLELISM)
@@ -59,7 +67,7 @@ endif()
 message(STATUS "PARALLELISM=${PARALLELISM}")
 
 # Use cmake -DUSER_FLAGS=<flags> to set extra flags for general compilation.
-set(USER_FLAGS ${USER_FLAGS};-DLOGN=${LOGN};-DPARALLELISM=${PARALLELISM})
+set(USER_FLAGS ${USER_FLAGS};-DLOGN=${LOGN};-DLOGNCOL=${LOGNCOL};-DPARALLELISM=${PARALLELISM})
 
 # Use cmake -DUSER_INCLUDE_PATHS=<paths> to set extra paths for general
 # compilation.

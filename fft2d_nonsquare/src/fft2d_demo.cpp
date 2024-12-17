@@ -93,7 +93,7 @@ void TestFFT(bool inverse) {
     constexpr int kParallelism = 4;
 #else
     constexpr int kLogN = LOGN;
-    // constexpr int kLogN_column = LOGN_column; //need to be indicated in cmake
+    constexpr int kLogN_column = LOGNCOL; //need to be indicated in cmake
     constexpr int kParallelism = PARALLELISM;
 #endif
 
@@ -103,7 +103,7 @@ void TestFFT(bool inverse) {
 
     constexpr int kN = 1 << kLogN; //size of fft matrix, eg 16*16
     //--------------- 
-    constexpr int kLogN_column = kLogN + 1; //column = row * 2, eg. 32*64
+    // constexpr int kLogN_column = kLogN + 2; //column = row * 2, eg. 32*64
     constexpr int kLogN_max = (kLogN_column > kLogN) ? kLogN_column : kLogN; //
     constexpr int kN_column = 1 << kLogN_column;
     constexpr int kLogParallelism = kParallelism == 8 ? 3 : 2; //log8=3,log4=2
