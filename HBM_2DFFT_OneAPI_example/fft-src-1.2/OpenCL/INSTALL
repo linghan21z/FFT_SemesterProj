@@ -1,0 +1,49 @@
+This is example illustrates how to use Statrix 10 HBM memories for a parallel 
+2D FFT transformation. It includes an efficient translation of data from row 
+to column addressing, using internal registers and block memories to ensure 
+efficient HBM access patterns.
+
+*******************************************************************************
+Prerequisites
+*******************************************************************************
+	
+	Intel FPGA SDK for OpenCL v20.4 (with Startix 10 device files)	 
+	Bittware p520_hpc_m210h_g3x16 BSP (v20.4)
+
+
+*******************************************************************************
+Setup
+*******************************************************************************
+
+Intel FPGA SDK can be downloaded from here...
+
+	 https://fpgasoftware.intel.com/opencl
+
+Follow the instructions to install the SDK.
+
+Install the bittware BSP into the correct folder as instructed by the FPGA 
+SDK documentation.
+
+Follow the BSP installaton instructions.
+
+*******************************************************************************
+Compilation and execution
+*******************************************************************************
+
+To build the design run the build script in the device folder...
+
+	cd device
+
+To build the aocx binary running the following script. This will take several 
+hours.
+
+	./build.sh
+
+To compile the host code run make in the root directory...
+
+	make
+
+Then run the excutable...
+
+	./ff2d_opencl.exe
+

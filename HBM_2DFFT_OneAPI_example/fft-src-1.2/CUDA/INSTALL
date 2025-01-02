@@ -1,0 +1,19 @@
+This code uses CUDA to benchmark a 2D FFT on GPU. It is provided as a point of 
+reference for performance comparisons. 
+
+*******************************************************************************
+Prerequisites
+*******************************************************************************
+
+    cmake 3.5 or higher
+	cuda (we tested with 10.0.130-1 which was the latest at  that time)
+	cufft
+
+
+*******************************************************************************
+Setup
+*******************************************************************************
+
+cmake CMakeLists.txt
+
+

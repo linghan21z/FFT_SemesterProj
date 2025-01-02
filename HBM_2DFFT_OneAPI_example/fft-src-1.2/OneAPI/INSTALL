@@ -1,0 +1,146 @@
+This example uses "cmake" to build either an fpga emulation of the FFT code or 
+the FPGA device image itself.
+
+*******************************************************************************
+Prerequisites
+*******************************************************************************
+
+    cmake
+	Intel oneAPI Base ToolKit 2021.2.0
+	Intel FPGA Add-on for Intel Custom Platforms using Quartus 20.4
+	Bittware p520_hpc_m210h_g3x16 BSP (20.4)
+	FFTW3 developer libraries
+
+Note. When using cmake it is possible that the wrong GCC toolchain could be used 
+if the CC and CXX environment variables are not set prior to running cmake.
+
+*******************************************************************************
+Setup
+*******************************************************************************
+
+Intel OneAPI toolkits can be downloaded from here...
+
+	https://software.intel.com/content/www/us/en/develop/tools/oneapi.html
+
+Follow the instructions to install the oneAPI base toolkit and the FPGA add-on
+for custom platforms.
+
+Install the extracted bittware BSP folder into the correct folder as instructed by the oneAPI
+documentation.
+
+	E.g. /opt/intel/oneapi/intelfpgadpcpp/2021.2.0/board
+
+Follow the BSP installaton instructions.
+
+* FFTW support using yum *
+
+Install fftw for comparing the FPGA results with the fftw library. On Centos
+this can be done using "yum"...
+
+	yum install fftw3-devel
+
+* FFTW support from source *
+
+Alternatively, in the absence of root privileges, the fftw3 library can built
+from source (See link below)...
+ 
+	http://www.fftw.org
+
+Ensure the LD_LIBRARY_PATH and LIBRARY_PATH environment point to the newly 
+built fftw3 libraries.
+
+Set the HOST_INCLUDE_PATHS environment variable to point to any required
+headers.
+
+* OneAPI setup *
+
+To enable the required oneAPI environment variables, run the oneAPI setup 
+script. E.g. ...
+
+	cd /opt/intel/oneapi/
+	source setvars.sh
+
+*******************************************************************************
+Compilation and execution
+*******************************************************************************
+
+Run "cmake" to generate the required makefiles for the project...
+
+	cmake CMakeLists.txt
+
+To compile for emulation type...
+
+	make fpga_emu
+
+This will generate the executable...
+
+	fft2d_oneapi.fpga_emu
+
+Before running the executable run the "set_vars.sh" script to increase the size
+of the device memory available. Failure to do so may cause a CL out of memory
+error when running the emulation.
+
+Running this executable verifies that the code is functionally correct, prior 
+to a time consuming FPGA build. The emulation executable will produce a text file that can be
+inspected. It will also produce sample image data that can be viewed using the python3 script
+display_results.py.
+
+Prior to running the script, run the following to ensure the required python modules are present:
+
+        python3 -m pip install matplotlib numpy tornado
+
+Then run the python script:
+
+        python3 display_results.py
+
+The local web browser will launch and display the input and output images from the emulation run. 
+
+To setup assumes the "p520_hpc_m210h_g3x16" board package is installed on the system.
+If multiple BSP installations are present, it is possible to set the source
+directory of the BSP by setting the environment variable BOARD_PACKAGE_DIR, 
+e.g...
+
+	export BOARD_PACKAGE_DIR=/opt/intel/oneapi/intelfpgadpcpp/2021.2.0/board/bittware_pci/s10mx
+
+Regenerate makefile accordingly...
+	
+	cmake CMakeLists.txt
+
+To compile the design to generate an early image with optimization report type
+the following...
+
+	make report
+
+To build the fpga image type... (Note: This will take several hours)...
+
+	make fpga
+
+This will generate the executable...
+
+	fft2d_oneapi.fpga
+
+A static binary is made first which also contains the FPGA device binary. Once 
+built it is linked with the host code. This allows the host code to be modified 
+without the need to rebuild the FPGA binary. When rebuilding the fpga image, 
+ensure the privious library is deleted ("src/dev_image.a"). Failure to do so will
+cause the new image to be appended to the existing library, causing an error 
+during linking. The image will then require full rebuild taking several hours. This 
+library is not automatically deleted to prevent any host code changes triggering 
+a full FPGA image re-compilation.
+
+To run on hardware ensure a Bittware 520 MX card is present and installed. 
+If the device is not already preprogrammed with a relevant BSP, this will need to be 
+done prior to running the FPGA executable.
+
+If when running on hardware you receive the error CL_DEVICE_NOT_FOUND it is most
+likely that there is a conflict between how the system has been setup for native
+OpenCL SDK runtime and the OneAPI installation for how the BSP is located. The
+native OpenCL SDK installs BSPs and pointers to them via fcd entries in the folder
+/opt/Intel/OpenCL/Boards however OneAPI now expects these fcd entries to be located
+at /opt/Intel/OpenCLFPGA/oneAPI/Boards. The simplest solution is to copy the fcd
+into the /opt/Intel/OpenCLFPGA/oneAPI/Boards location.
+
+The executable will create a binary representation of the input and output images,
+which can be displayed by running the following python script...
+
+	python3 display_results.py
