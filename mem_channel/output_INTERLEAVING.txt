@@ -1,0 +1,23 @@
+cmake .. -DFPGA_DEVICE=Stratix10 
+
+[zhao@eslsrv2 build]$ ./mem_channel.fpga_emu 
+Running on device: Intel(R) FPGA Emulation Device
+
+Vector size: 1000000
+Verification PASSED
+
+Kernel execution time: 0.002268 seconds
+Kernel throughput: 1322.657430 MB/s
+
+/////////////////////
+
+cmake .. -DFPGA_DEVICE=Stratix10 -DPART=NO_INTERLEAVING
+
+[zhao@eslsrv2 build]$ ./mem_channel.fpga_emu 
+Running on device: Intel(R) FPGA Emulation Device
+
+Vector size: 1000000
+Verification PASSED
+
+Kernel execution time: 0.002406 seconds
+Kernel throughput: 1246.716461 MB/s
